@@ -91,7 +91,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
 
         CommunityRecommendedSettingsChoice,
 
-        ShowTransmitterName
+        ShowTransmitterName,
+
+        PilotRosterManuallySized
     }
 
     public enum InputBinding
@@ -354,6 +356,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
             {GlobalSettingsKeys.RadioOverlayTaskbarHide.ToString(), "false"},
             {GlobalSettingsKeys.AutoStartRadioOverlay.ToString(), "true"},
             {GlobalSettingsKeys.AutoStartPilotRoster.ToString(), "false"},
+            {GlobalSettingsKeys.PilotRosterManuallySized.ToString(), "false"},
             {GlobalSettingsKeys.RefocusIL2.ToString(), "false"},
             {GlobalSettingsKeys.ExpandControls.ToString(), "false"},
 
@@ -511,6 +514,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         public void SetClientSetting(GlobalSettingsKeys key, string value)
         {
             SetSetting("Client Settings", key.ToString(), value);
+        }
+
+        public bool HasClientSetting(GlobalSettingsKeys key)
+        {
+            return _configuration.Contains("Client Settings")
+                   && _configuration["Client Settings"].Contains(key.ToString());
         }
 
         public void SetClientSetting(GlobalSettingsKeys key, bool value)

@@ -61,6 +61,32 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
             return new Rect(left, top, width, height);
         }
 
+        internal static Rect FitHeightToContent(
+            Rect currentBounds,
+            Rect workArea,
+            double contentHeight,
+            double minimumWidth,
+            double minimumHeight,
+            bool manuallySized)
+        {
+            if (manuallySized)
+            {
+                return currentBounds;
+            }
+
+            return ConstrainToWorkArea(
+                new Rect(currentBounds.Left, currentBounds.Top, currentBounds.Width, Math.Max(minimumHeight, contentHeight)),
+                workArea,
+                0,
+                minimumWidth,
+                minimumHeight);
+        }
+
+        internal static bool IsUserChosenHeight(double savedHeight, double defaultHeight)
+        {
+            return Math.Abs(savedHeight - defaultHeight) > 0.5;
+        }
+
         private static bool IsUsable(Rect area)
         {
             return !area.IsEmpty &&

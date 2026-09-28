@@ -6,6 +6,11 @@
 
 - Bind **Mute / Unmute Radio 1** and **Mute / Unmute Radio 2** in the Controls tab to mute or unmute a specific radio, whichever radio is currently selected.
 
+### Changed
+
+- The Pilot Roster now fits its height to the pilots listed, growing or shrinking as pilots join or leave while staying on screen. Once you resize the roster by dragging its edge, it keeps your chosen size and stops fitting automatically, including after restarting SRS.
+- If you had already resized the Pilot Roster in an earlier version, SRS keeps that size and does not fit the roster automatically.
+
 ### Compatibility
 
 - Existing SRS servers remain compatible; no server update is required for these client-side changes.

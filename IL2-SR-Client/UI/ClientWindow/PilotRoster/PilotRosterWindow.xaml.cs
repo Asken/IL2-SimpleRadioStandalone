@@ -18,9 +18,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
     {
         private const int ResizeHitTestThickness = 8;
         private const int WmNcHitTest = 0x0084;
+        private const int WmSizing = 0x0214;
         private const int HtRight = 11;
         private const int HtBottom = 15;
         private const int HtBottomRight = 17;
+        private const double RosterGridHeightSafetyPadding = 8.0;
         private const double DefaultRosterX = 360.0;
         private const double DefaultRosterY = 260.0;
         private const double DefaultRosterWidth = 560.0;
@@ -29,11 +31,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
         private readonly ObservableCollection<PilotRosterEntry> _pilotRoster = new ObservableCollection<PilotRosterEntry>();
         private readonly DispatcherTimer _updateTimer;
         private HwndSource _hwndSource;
+        private bool _manuallySized;
         public bool IsUnavailableMode { get; }
 
         public PilotRosterWindow(bool showUnavailableMessage = false)
         {
             IsUnavailableMode = showUnavailableMessage;
+            _manuallySized = LoadManuallySized();
             InitializeComponent();
             LocalizationManager.LocalizeElement(this);
             ApplyLocalizedText();
@@ -228,6 +232,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
             VehicleColumn.Visibility = _pilotRoster.Any(entry => entry.HasVehicle) ? Visibility.Visible : Visibility.Collapsed;
             AirfieldColumn.Visibility = _pilotRoster.Any(entry => entry.HasAirfield) ? Visibility.Visible : Visibility.Collapsed;
             RefreshAutoColumnWidths();
+            FitHeightToRoster();
         }
 
         private void RefreshAutoColumnWidths()
@@ -239,6 +244,39 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
             Radio2Column.Width = DataGridLength.SizeToHeader;
             PilotColumn.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
             PilotList.UpdateLayout();
+        }
+
+        private void FitHeightToRoster()
+        {
+            if (PilotList.Visibility != Visibility.Visible || PilotList.ActualHeight <= 0)
+            {
+                return;
+            }
+
+            var currentBounds = new Rect(Left, Top, Width, Height);
+            var workArea = GetCurrentWorkArea(currentBounds);
+            var rosterChromeHeight = Math.Max(0, ActualHeight - PilotList.ActualHeight);
+            var desiredHeight = rosterChromeHeight + PilotList.ColumnHeaderHeight
+                                + _pilotRoster.Count * PilotList.RowHeight
+                                + PilotList.BorderThickness.Top + PilotList.BorderThickness.Bottom
+                                + RosterGridHeightSafetyPadding;
+            var fittedBounds = PilotRosterScreenBounds.FitHeightToContent(
+                currentBounds,
+                workArea,
+                desiredHeight,
+                MinWidth,
+                MinHeight,
+                _manuallySized);
+
+            if (Math.Abs(Height - fittedBounds.Height) > 0.5)
+            {
+                Height = fittedBounds.Height;
+            }
+
+            if (Math.Abs(Top - fittedBounds.Top) > 0.5)
+            {
+                Top = fittedBounds.Top;
+            }
         }
 
         private void EnsureWindowIsOnScreen()
@@ -317,6 +355,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
+            // WM_SIZING is only sent while the user drags a resize edge, never for programmatic
+            // Height changes, so it reliably marks a user-chosen size that auto-fit must respect.
+            if (msg == WmSizing)
+            {
+                MarkManuallySized();
+            }
+
             if (msg == WmNcHitTest)
             {
                 var resizeHitTest = GetResizeHitTest(lParam);
@@ -328,6 +373,31 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
             }
 
             return IntPtr.Zero;
+        }
+
+        private bool LoadManuallySized()
+        {
+            if (!_globalSettings.HasClientSetting(GlobalSettingsKeys.PilotRosterManuallySized))
+            {
+                // First run with auto-fit: earlier versions never resized the roster themselves,
+                // so a non-default saved height is a size the user chose and must be kept.
+                var savedHeight = _globalSettings.GetFinitePositionSetting(GlobalSettingsKeys.PilotRosterHeight, DefaultRosterHeight);
+                _globalSettings.SetClientSetting(GlobalSettingsKeys.PilotRosterManuallySized,
+                    PilotRosterScreenBounds.IsUserChosenHeight(savedHeight, DefaultRosterHeight));
+            }
+
+            return _globalSettings.GetClientSettingBool(GlobalSettingsKeys.PilotRosterManuallySized);
+        }
+
+        private void MarkManuallySized()
+        {
+            if (_manuallySized)
+            {
+                return;
+            }
+
+            _manuallySized = true;
+            _globalSettings.SetClientSetting(GlobalSettingsKeys.PilotRosterManuallySized, true);
         }
 
         private IntPtr GetResizeHitTest(IntPtr lParam)
