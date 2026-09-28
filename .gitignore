@@ -7,6 +7,9 @@
 *.userosscache
 *.sln.docstates
 
+# Temporary projects left behind by the WPF markup compiler
+*_wpftmp.csproj
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
