@@ -726,6 +726,12 @@
   <data name="Mute / Unmute Other Radio" xml:space="preserve">
     <value>Éteindre / rallumer l'autre radio</value>
   </data>
+  <data name="Mute / Unmute Radio 1" xml:space="preserve">
+    <value>Éteindre / rallumer la radio 1</value>
+  </data>
+  <data name="Mute / Unmute Radio 2" xml:space="preserve">
+    <value>Éteindre / rallumer la radio 2</value>
+  </data>
   <data name="Mute / Unmute Both Radios" xml:space="preserve">
     <value>Éteindre / rallumer les deux radios</value>
   </data>

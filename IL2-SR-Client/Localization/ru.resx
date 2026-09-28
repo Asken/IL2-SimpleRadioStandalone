@@ -726,6 +726,12 @@
   <data name="Mute / Unmute Other Radio" xml:space="preserve">
     <value>Приглушить / вернуть другое радио</value>
   </data>
+  <data name="Mute / Unmute Radio 1" xml:space="preserve">
+    <value>Приглушить / вернуть радио 1</value>
+  </data>
+  <data name="Mute / Unmute Radio 2" xml:space="preserve">
+    <value>Приглушить / вернуть радио 2</value>
+  </data>
   <data name="Mute / Unmute Both Radios" xml:space="preserve">
     <value>Приглушить / вернуть оба радио</value>
   </data>

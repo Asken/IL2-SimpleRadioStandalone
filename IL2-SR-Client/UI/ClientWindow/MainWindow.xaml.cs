@@ -736,6 +736,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             ToggleOtherRadioMute.ControlInputBinding = InputBinding.ToggleOtherRadioMute;
             ToggleOtherRadioMute.InputDeviceManager = InputManager;
 
+            ToggleRadio1Mute.InputName = LocalizationManager.Get("Mute / Unmute Radio 1");
+            ToggleRadio1Mute.ControlInputBinding = InputBinding.ToggleRadio1Mute;
+            ToggleRadio1Mute.InputDeviceManager = InputManager;
+
+            ToggleRadio2Mute.InputName = LocalizationManager.Get("Mute / Unmute Radio 2");
+            ToggleRadio2Mute.ControlInputBinding = InputBinding.ToggleRadio2Mute;
+            ToggleRadio2Mute.InputDeviceManager = InputManager;
+
             ToggleAllRadiosMute.InputName = LocalizationManager.Get("Mute / Unmute Both Radios");
             ToggleAllRadiosMute.ControlInputBinding = InputBinding.ToggleAllRadiosMute;
             ToggleAllRadiosMute.InputDeviceManager = InputManager;
@@ -795,6 +803,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             ReadStatus.InputName = LocalizationManager.Get("Read Status (TTS on required)");
             ToggleSelectedRadioMute.InputName = LocalizationManager.Get("Mute / Unmute Selected Radio");
             ToggleOtherRadioMute.InputName = LocalizationManager.Get("Mute / Unmute Other Radio");
+            ToggleRadio1Mute.InputName = LocalizationManager.Get("Mute / Unmute Radio 1");
+            ToggleRadio2Mute.InputName = LocalizationManager.Get("Mute / Unmute Radio 2");
             ToggleAllRadiosMute.InputName = LocalizationManager.Get("Mute / Unmute Both Radios");
             ToggleMicrophoneMute.InputName = LocalizationManager.Get("Mute / Unmute Microphone");
             Radio1ChannelUp.InputName = LocalizationManager.Get("Radio 1 Channel Up");
@@ -842,6 +852,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             ReadStatus.LoadInputSettings();
             ToggleSelectedRadioMute.LoadInputSettings();
             ToggleOtherRadioMute.LoadInputSettings();
+            ToggleRadio1Mute.LoadInputSettings();
+            ToggleRadio2Mute.LoadInputSettings();
             ToggleAllRadiosMute.LoadInputSettings();
             ToggleMicrophoneMute.LoadInputSettings();
             Radio1ChannelUp.LoadInputSettings();

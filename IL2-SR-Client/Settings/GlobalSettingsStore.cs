@@ -231,6 +231,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         TogglePilotRoster = 145,
         ModifierTogglePilotRoster = 245,
 
+        ToggleRadio1Mute = 146,
+        ModifierToggleRadio1Mute = 246,
+
+        ToggleRadio2Mute = 147,
+        ModifierToggleRadio2Mute = 247,
+
     }
 
 

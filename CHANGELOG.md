@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Bind **Mute / Unmute Radio 1** and **Mute / Unmute Radio 2** in the Controls tab to mute or unmute a specific radio, whichever radio is currently selected.
+
+### Compatibility
+
+- Existing SRS servers remain compatible; no server update is required for these client-side changes.
+
 ## IL2-SRS 1.0.4.12
 
 ### Added

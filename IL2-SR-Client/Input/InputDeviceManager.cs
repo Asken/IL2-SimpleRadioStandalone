@@ -662,8 +662,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                                 break;
                             }
                         }
-                        else if ((int)bindState.MainDevice.InputBind >= (int)InputBinding.RadioChannel1 &&
-                                 (int)bindState.MainDevice.InputBind <= (int)InputBinding.Radio2ChannelDown)
+                        else if (IsRadioControlBinding(bindState.MainDevice.InputBind))
                         {
                             if (bindState.MainDevice.InputBind == _lastActiveBinding && !bindState.IsActive)
                             {
@@ -854,6 +853,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                                         case InputBinding.ToggleOtherRadioMute:
                                             RadioHelper.ToggleOtherRadioMute();
                                             break;
+                                        case InputBinding.ToggleRadio1Mute:
+                                            RadioHelper.ToggleRadio1Mute();
+                                            break;
+                                        case InputBinding.ToggleRadio2Mute:
+                                            RadioHelper.ToggleRadio2Mute();
+                                            break;
                                         case InputBinding.ToggleAllRadiosMute:
                                             RadioHelper.ToggleAllRadiosMute();
                                             break;
@@ -932,6 +937,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         public void StopPtt()
         {
             _detectPtt = false;
+        }
+
+        internal static bool IsRadioControlBinding(InputBinding binding)
+        {
+            return (binding >= InputBinding.RadioChannel1 && binding <= InputBinding.Radio2ChannelDown)
+                   || binding == InputBinding.ToggleRadio1Mute
+                   || binding == InputBinding.ToggleRadio2Mute;
         }
 
         private void MarkPttInputPoll()
@@ -1310,7 +1322,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
 
             //REMEMBER TO UPDATE THIS WHEN NEW BINDINGS ARE ADDED
             //MIN + MAX bind numbers
-            for (int i = (int)InputBinding.Intercom; i <= (int)InputBinding.TogglePilotRoster; i++)
+            for (int i = (int)InputBinding.Intercom; i <= (int)InputBinding.ToggleRadio2Mute; i++)
             {
                 if (!currentInputProfile.ContainsKey((InputBinding)i))
                 {

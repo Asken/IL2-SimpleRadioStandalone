@@ -31,6 +31,26 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Input
         }
 
         [TestMethod]
+        public void FixedRadioMuteBindingsAreInsideScannedInputRangeAndHaveModifiers()
+        {
+            Assert.IsTrue(InputBinding.ToggleRadio1Mute >= InputBinding.Intercom);
+            Assert.IsTrue(InputBinding.ToggleRadio1Mute <= InputBinding.ToggleRadio2Mute);
+            Assert.IsTrue(InputBinding.ToggleRadio2Mute > InputBinding.TogglePilotRoster);
+            Assert.AreEqual((int)InputBinding.ToggleRadio1Mute + 100, (int)InputBinding.ModifierToggleRadio1Mute);
+            Assert.AreEqual((int)InputBinding.ToggleRadio2Mute + 100, (int)InputBinding.ModifierToggleRadio2Mute);
+        }
+
+        [TestMethod]
+        public void FixedRadioMuteBindingsReachRadioControlDispatcher()
+        {
+            Assert.IsTrue(InputDeviceManager.IsRadioControlBinding(InputBinding.ToggleRadio1Mute));
+            Assert.IsTrue(InputDeviceManager.IsRadioControlBinding(InputBinding.ToggleRadio2Mute));
+            Assert.IsTrue(InputDeviceManager.IsRadioControlBinding(InputBinding.ToggleSelectedRadioMute));
+            Assert.IsFalse(InputDeviceManager.IsRadioControlBinding(InputBinding.TogglePilotRoster));
+            Assert.IsFalse(InputDeviceManager.IsRadioControlBinding(InputBinding.Ptt2));
+        }
+
+        [TestMethod]
         public void RestartSrsBindingIsInsideScannedInputRange()
         {
             Assert.IsTrue(InputBinding.RestartSrs >= InputBinding.Intercom);

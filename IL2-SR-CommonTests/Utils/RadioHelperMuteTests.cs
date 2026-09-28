@@ -81,6 +81,45 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Utils
         }
 
         [TestMethod]
+        public void FixedRadioMuteBindingsIgnoreSelectedRadioAndPreservePtt()
+        {
+            var state = ClientStateSingleton.Instance.PlayerGameState;
+            state.selected = 2;
+            state.ptt = true;
+
+            RadioHelper.ToggleRadio1Mute();
+
+            Assert.IsTrue(RadioHelper.IsRadioMuted(1));
+            Assert.IsFalse(RadioHelper.IsRadioMuted(2));
+            Assert.IsTrue(state.ptt);
+            Assert.AreEqual(0.8f, state.radios[1].volume);
+
+            state.selected = 1;
+            RadioHelper.ToggleRadio2Mute();
+
+            Assert.IsTrue(RadioHelper.IsRadioMuted(1));
+            Assert.IsTrue(RadioHelper.IsRadioMuted(2));
+            Assert.AreEqual(0.9f, state.radios[2].volume);
+
+            RadioHelper.ToggleRadio1Mute();
+            RadioHelper.ToggleRadio2Mute();
+
+            Assert.IsFalse(RadioHelper.IsRadioMuted(1));
+            Assert.IsFalse(RadioHelper.IsRadioMuted(2));
+        }
+
+        [TestMethod]
+        public void FixedRadioTwoMuteIgnoresDisabledRadio()
+        {
+            var state = ClientStateSingleton.Instance.PlayerGameState;
+            state.radios[2].modulation = RadioInformation.Modulation.DISABLED;
+
+            RadioHelper.ToggleRadio2Mute();
+
+            Assert.IsFalse(RadioHelper.IsRadioMuted(2));
+        }
+
+        [TestMethod]
         public void ToggleAllRadiosMuteMutesAvailableRadiosThenRestoresWhenAllAreMuted()
         {
             RadioHelper.ToggleAllRadiosMute();

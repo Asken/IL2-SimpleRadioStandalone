@@ -325,6 +325,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Utils
             }
         }
 
+        public static void ToggleRadio1Mute()
+        {
+            ToggleRadioMute(1, GetSelectedRadioMutedVolume());
+        }
+
+        public static void ToggleRadio2Mute()
+        {
+            ToggleRadioMute(2, GetSelectedRadioMutedVolume());
+        }
+
         public static void ToggleAllRadiosMute()
         {
             if (ClientStateSingleton.Instance.PlayerGameState == null)
