@@ -244,6 +244,30 @@ namespace Installer
             return false;
         }
 
+        public static string SelectDefaultInstallPath(string registeredPath, string recommendedPath)
+        {
+            return SelectDefaultInstallPath(registeredPath, recommendedPath, IsInsideGameFolder);
+        }
+
+        // Updates install where SRS already lives, so users with a custom folder are not silently moved
+        // to Program Files. A stale registry entry or a copy inside a game folder falls back to the
+        // recommended location, which the installer already steers those users towards.
+        internal static string SelectDefaultInstallPath(
+            string registeredPath,
+            string recommendedPath,
+            Func<string, bool> isInsideGameFolder)
+        {
+            string registered = NormalizeDirectory(registeredPath);
+            if (string.IsNullOrWhiteSpace(registered)
+                || !File.Exists(Path.Combine(registered, ClientExecutable))
+                || isInsideGameFolder(registered))
+            {
+                return recommendedPath;
+            }
+
+            return registered;
+        }
+
         public static bool PathsEqual(string left, string right)
         {
             string normalizedLeft = NormalizeDirectory(left);

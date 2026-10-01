@@ -10,6 +10,7 @@
 
 - The Pilot Roster now fits its height to the pilots listed, growing or shrinking as pilots join or leave while staying on screen. Once you resize the roster by dragging its edge, it keeps your chosen size and stops fitting automatically, including after restarting SRS.
 - If you had already resized the Pilot Roster in an earlier version, SRS keeps that size and does not fit the roster automatically.
+- The installer and auto-updater now default to the folder where SRS is already installed, so an installation in a custom folder is updated in place instead of moving to `C:\Program Files\IL2-SimpleRadio-Standalone`. You can still choose a different folder before installing. Installations inside an IL-2 game folder continue to default to the recommended location.
 
 ### Compatibility
 

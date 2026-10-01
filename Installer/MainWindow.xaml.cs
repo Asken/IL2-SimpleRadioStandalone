@@ -59,7 +59,7 @@ namespace Installer
             containerPanel.MouseLeftButtonDown += GridPanel_MouseLeftButtonDown;
 
             _registeredSrsPath = ReadPath("SRSPath");
-            srPath.Text = RecommendedInstallPath;
+            srPath.Text = SrsInstallConsolidator.SelectDefaultInstallPath(_registeredSrsPath, RecommendedInstallPath);
             IL2ScriptsPath.Text = string.Empty;
             UpdateDetectedGamesSummary();
 

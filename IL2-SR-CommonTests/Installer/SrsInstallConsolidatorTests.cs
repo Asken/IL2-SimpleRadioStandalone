@@ -132,6 +132,89 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Installer
             }
         }
 
+        [TestMethod]
+        public void DefaultInstallPathKeepsExistingCustomInstallFolder()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-default-path-" + Guid.NewGuid().ToString("N"));
+            string existing = Path.Combine(root, "Games", "SRS");
+            string recommended = Path.Combine(root, "Program Files", "IL2-SimpleRadio-Standalone");
+
+            try
+            {
+                Directory.CreateDirectory(existing);
+                Write(Path.Combine(existing, "IL2-SR-ClientRadio.exe"), "dummy");
+
+                Assert.AreEqual(existing, SelectDefaultInstallPath(existing + "\\", recommended));
+                Assert.AreEqual(existing, SelectDefaultInstallPath("\"" + existing + "\"", recommended));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void DefaultInstallPathFallsBackToRecommendedWithoutUsableExistingInstall()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-default-path-" + Guid.NewGuid().ToString("N"));
+            string emptyFolder = Path.Combine(root, "Games", "OldSRS");
+            string recommended = Path.Combine(root, "Program Files", "IL2-SimpleRadio-Standalone");
+
+            try
+            {
+                Directory.CreateDirectory(emptyFolder);
+
+                Assert.AreEqual(recommended, SelectDefaultInstallPath(null, recommended));
+                Assert.AreEqual(recommended, SelectDefaultInstallPath("", recommended));
+                Assert.AreEqual(recommended, SelectDefaultInstallPath(Path.Combine(root, "Missing"), recommended));
+                Assert.AreEqual(recommended, SelectDefaultInstallPath(emptyFolder, recommended));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void DefaultInstallPathIgnoresExistingInstallInsideGameFolder()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-default-path-" + Guid.NewGuid().ToString("N"));
+            string insideGame = Path.Combine(root, "IL-2 Sturmovik Great Battles", "SRS");
+            string recommended = Path.Combine(root, "Program Files", "IL2-SimpleRadio-Standalone");
+
+            try
+            {
+                Directory.CreateDirectory(insideGame);
+                Write(Path.Combine(insideGame, "IL2-SR-ClientRadio.exe"), "dummy");
+
+                Assert.AreEqual(recommended, global::Installer.SrsInstallConsolidator.SelectDefaultInstallPath(
+                    insideGame,
+                    recommended,
+                    path => path.StartsWith(Path.Combine(root, "IL-2 Sturmovik Great Battles"), StringComparison.OrdinalIgnoreCase)));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        private static string SelectDefaultInstallPath(string registeredPath, string recommendedPath)
+        {
+            return global::Installer.SrsInstallConsolidator.SelectDefaultInstallPath(
+                registeredPath,
+                recommendedPath,
+                path => false);
+        }
+
         private static void Write(string path, string value)
         {
             File.WriteAllText(path, value);
