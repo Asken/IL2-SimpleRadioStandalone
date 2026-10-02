@@ -1,0 +1,7 @@
+@* A Lucide icon by name (see LucideIcons.cs). Decorative: hidden from screen readers. *@
+<svg class="icon @Class" viewBox="0 0 24 24" aria-hidden="true" focusable="false">@((MarkupString)LucideIcons.Paths[Name])</svg>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; }
+    [Parameter] public string Class { get; set; }
+}

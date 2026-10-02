@@ -91,13 +91,14 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .brand { display: flex; align-items: center; gap: .5rem; color: var(--text); text-decoration: none; font-weight: 600; }
 .brand h1 { font-size: 1.2rem; }
 .topbar-meta { color: var(--muted); font-size: .88rem; }
-.theme-toggle { margin-left: auto; min-width: 6.5rem; }
-/* Only the label for the current choice is shown; app.js sets data-theme-choice on <html>. */
+.theme-toggle { margin-left: auto; padding: .4rem .5rem; }
+/* Icon-only toggle: only the icon for the current choice is shown; app.js sets data-theme-choice on <html>. */
 .theme-label { display: none; }
 :root:not([data-theme-choice]) .theme-label-desktop,
 :root[data-theme-choice="desktop"] .theme-label-desktop,
 :root[data-theme-choice="light"] .theme-label-light,
-:root[data-theme-choice="dark"] .theme-label-dark { display: inline; }
+:root[data-theme-choice="dark"] .theme-label-dark { display: block; }
+.icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .logout { margin-left: 0; }
 
 .sidenav {
