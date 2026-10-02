@@ -9,8 +9,8 @@
     4. Sets the repository's short description and overview (IL2-SRS-Server-Web/DOCKERHUB.md).
 
     Pushing and updating the page both use your existing `docker login` (read from Docker's credential
-    helper; nothing is printed). To use a different account or run in CI, set DOCKERHUB_TOKEN to a
-    Docker Hub personal access token with Read & Write access; it then takes precedence.
+    helper; nothing is printed). Editing the page needs a personal access token with 'Read, Write, Delete'
+    access; if your docker login token has less, set DOCKERHUB_TOKEN to such a token. It takes precedence.
 
 .EXAMPLE
     .\IL2-SRS-Server-Web\scripts\Publish-DockerImage.ps1
@@ -124,8 +124,15 @@ $body = @{
     description      = $ShortDescription
     full_description = (Get-Content $overviewFile -Raw)
 } | ConvertTo-Json
-Invoke-RestMethod -Method Patch -Uri "https://hub.docker.com/v2/repositories/$Repository/" `
-    -Headers @{ Authorization = "Bearer $($login.token)" } -ContentType 'application/json; charset=utf-8' `
-    -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+try {
+    Invoke-RestMethod -Method Patch -Uri "https://hub.docker.com/v2/repositories/$Repository/" `
+        -Headers @{ Authorization = "Bearer $($login.token)" } -ContentType 'application/json; charset=utf-8' `
+        -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+}
+catch {
+    throw "The image is pushed, but the Docker Hub page was not updated ($($_.Exception.Message)). " +
+          "Editing the description needs a personal access token with 'Read, Write, Delete' access; " +
+          "set DOCKERHUB_TOKEN to one (or docker login with it) and run the script again."
+}
 
 Write-Host "Published $versionTag and $channelTag, and updated https://hub.docker.com/r/$Repository"

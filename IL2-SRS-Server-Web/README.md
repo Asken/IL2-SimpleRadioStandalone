@@ -91,8 +91,9 @@ Then use `il2-srs-server` as the image name in the commands above.
 
 `scripts/Publish-DockerImage.ps1` builds the image from the current commit (refusing uncommitted
 changes), pushes `<version>-preview` and `preview` to Docker Hub, and updates the Docker Hub short
-description and overview from [`DOCKERHUB.md`](DOCKERHUB.md). It uses your `docker login` for both;
-set `DOCKERHUB_TOKEN` to a Docker Hub access token (Read & Write) to use another account or run it in CI.
+description and overview from [`DOCKERHUB.md`](DOCKERHUB.md). It uses your `docker login` for both.
+Editing the Hub page needs an access token with **Read, Write, Delete** access; if your `docker login`
+token has less, set `DOCKERHUB_TOKEN` to such a token (also the way to run it in CI).
 Use `-Suffix '' -Channel latest` for a release. The repository category can only be set on the Docker Hub website.
 
 ### Notes
