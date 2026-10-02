@@ -87,6 +87,14 @@ docker build -f IL2-SRS-Server-Web/Dockerfile -t il2-srs-server .
 
 Then use `il2-srs-server` as the image name in the commands above.
 
+### Publishing the image
+
+`scripts/Publish-DockerImage.ps1` builds the image from the current commit (refusing uncommitted
+changes), pushes `<version>-preview` and `preview` to Docker Hub, and updates the Docker Hub short
+description and overview from [`DOCKERHUB.md`](DOCKERHUB.md). It uses your `docker login` for both;
+set `DOCKERHUB_TOKEN` to a Docker Hub access token (Read & Write) to use another account or run it in CI.
+Use `-Suffix '' -Channel latest` for a release. The repository category can only be set on the Docker Hub website.
+
 ### Notes
 
 - Publish the SRS port for **both TCP and UDP**. If you change it with `SRS_SERVER_PORT`, change the published ports too.

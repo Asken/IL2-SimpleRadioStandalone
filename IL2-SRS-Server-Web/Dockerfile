@@ -19,6 +19,20 @@ RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
 
+# Set by scripts/Publish-DockerImage.ps1; plain builds are labelled "dev".
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG IMAGE_URL=https://hub.docker.com/r/asken/il2-srs-server
+LABEL org.opencontainers.image.title="IL2-SRS Server" \
+      org.opencontainers.image.description="IL2 SimpleRadio Standalone server with browser admin UI and REST API (IL-2 Great Battles & Korea)" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$REVISION" \
+      org.opencontainers.image.source="https://github.com/riaanjutte/IL2-SimpleRadioStandalone" \
+      org.opencontainers.image.documentation="https://github.com/riaanjutte/IL2-SimpleRadioStandalone/blob/master/IL2-SRS-Server-Web/README.md" \
+      org.opencontainers.image.url="$IMAGE_URL" \
+      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0-alpine"
+
 ENV SRS_DATA_DIR=/data \
     ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_gcServer=0
