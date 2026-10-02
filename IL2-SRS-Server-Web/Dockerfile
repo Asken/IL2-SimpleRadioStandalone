@@ -29,5 +29,9 @@ EXPOSE 8080/tcp
 # SRS clients: the same port over TCP (control) and UDP (voice); change with SRS_SERVER_PORT
 EXPOSE 6002/tcp 6002/udp
 
+# Healthy while both SRS listeners run; unhealthy if one fails or an admin stops the server.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["dotnet", "IL2-SRS-Server.dll", "--healthcheck"]
+
 USER $APP_UID
 ENTRYPOINT ["dotnet", "IL2-SRS-Server.dll"]

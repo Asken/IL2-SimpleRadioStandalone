@@ -76,7 +76,7 @@
             @foreach (var auditEvent in _recent)
             {
                 <li>
-                    <time class="date muted" datetime="@auditEvent.OccurredAtUtc.ToString("O")">@auditEvent.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time>
+                    <LocalTime Value="auditEvent.OccurredAtUtc" Format="time" Class="muted" />
                     <span class="tag tag-@auditEvent.Category">@auditEvent.Category</span>
                     <span>@auditEvent.Message</span>
                 </li>

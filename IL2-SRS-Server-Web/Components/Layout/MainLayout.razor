@@ -9,14 +9,11 @@
             <span>IL2-SRS Server</span>
         </a>
         <span class="topbar-meta">v@(Admin.Version) · port @Admin.Port</span>
-        <label class="theme-picker">
-            <span>Theme</span>
-            <select data-theme-picker>
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
-        </label>
+        <button type="button" class="btn btn-quiet theme-toggle" data-theme-toggle aria-label="Theme">
+            <span class="theme-label theme-label-desktop">◐ Desktop</span>
+            <span class="theme-label theme-label-light">☀ Light</span>
+            <span class="theme-label theme-label-dark">☾ Dark</span>
+        </button>
         @if (!AuthOptions.Disabled)
         {
             <form method="post" action="account/logout" class="logout">

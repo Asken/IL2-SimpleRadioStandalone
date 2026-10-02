@@ -19,7 +19,7 @@
     color-scheme: light;
 }
 
-/* Theme: System follows the desktop setting; Light/Dark are chosen in the top bar (theme.js). */
+/* Theme: Desktop follows the system setting; Light/Dark are chosen with the top-bar toggle (app.js). */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --bg: #14171c;
@@ -91,8 +91,13 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .brand { display: flex; align-items: center; gap: .5rem; color: var(--text); text-decoration: none; font-weight: 600; }
 .brand h1 { font-size: 1.2rem; }
 .topbar-meta { color: var(--muted); font-size: .88rem; }
-.theme-picker { margin-left: auto; display: flex; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); }
-.theme-picker select { padding: .25rem .4rem; font-size: .85rem; }
+.theme-toggle { margin-left: auto; min-width: 6.5rem; }
+/* Only the label for the current choice is shown; app.js sets data-theme-choice on <html>. */
+.theme-label { display: none; }
+:root:not([data-theme-choice]) .theme-label-desktop,
+:root[data-theme-choice="desktop"] .theme-label-desktop,
+:root[data-theme-choice="light"] .theme-label-light,
+:root[data-theme-choice="dark"] .theme-label-dark { display: inline; }
 .logout { margin-left: 0; }
 
 .sidenav {
@@ -313,6 +318,62 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
     padding: 1.5rem;
 }
 .login-card label { display: flex; flex-direction: column; gap: .3rem; font-size: .88rem; color: var(--muted); }
+
+/* Reconnect popup (replaces Blazor's default). Hidden unless blazor.web.js adds a components-reconnect-* class. */
+.reconnect { display: none; }
+.reconnect.components-reconnect-show,
+.reconnect.components-reconnect-retrying,
+.reconnect.components-reconnect-failed,
+.reconnect.components-reconnect-rejected,
+.reconnect.components-reconnect-paused,
+.reconnect.components-resume-failed {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    backdrop-filter: blur(2px);
+}
+
+.reconnect-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .9rem;
+    width: min(340px, calc(100% - 2rem));
+    padding: 1.5rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgb(0 0 0 / .25);
+    text-align: center;
+}
+
+.reconnect-text, .reconnect-reload { display: none; margin: 0; }
+.reconnect-spinner {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    animation: reconnect-spin .9s linear infinite;
+}
+
+@keyframes reconnect-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .reconnect-spinner { animation-duration: 3s; } }
+
+.components-reconnect-show .reconnect-retrying,
+.components-reconnect-retrying .reconnect-retrying,
+.components-reconnect-paused .reconnect-retrying { display: block; }
+.components-reconnect-failed .reconnect-failed,
+.components-resume-failed .reconnect-failed { display: block; }
+.components-reconnect-rejected .reconnect-rejected { display: block; }
+.components-reconnect-failed .reconnect-reload,
+.components-resume-failed .reconnect-reload { display: inline-flex; }
+.components-reconnect-failed .reconnect-spinner,
+.components-resume-failed .reconnect-spinner { display: none; }
 
 #blazor-error-ui {
     display: none;

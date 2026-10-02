@@ -1,14 +1,12 @@
-# docker compose -f IL2-SRS-Server-Web/docker-compose.yml up -d --build
+# docker compose -f docker-compose.yml up -d
 #
 # Put the admin password in a .env file next to this file (SRS_ADMIN_PASSWORD=...),
 # or export it in the shell before running compose.
+# To run an image built from source instead, see "Build from source" in README.md.
 
 services:
   il2-srs-server:
-    build:
-      context: ..
-      dockerfile: IL2-SRS-Server-Web/Dockerfile
-    image: il2-srs-server:latest
+    image: asken/il2-srs-server:preview
     container_name: il2-srs-server
     restart: unless-stopped
     environment:
@@ -20,7 +18,6 @@ services:
       # SRS_GLOBAL_LOBBY_FREQUENCIES: "248.22"
       # SRS_EVENT_RETENTION_DAYS: "30"
       # SRS_EVENT_MAX_ROWS: "100000"
-      TZ: ${TZ:-UTC}
     ports:
       - "6002:6002/tcp"
       - "6002:6002/udp"

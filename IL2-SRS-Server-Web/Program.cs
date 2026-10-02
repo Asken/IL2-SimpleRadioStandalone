@@ -35,18 +35,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
 
         public static int Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == HealthCheckCommand.Argument)
+            {
+                return HealthCheckCommand.Run();
+            }
+
             StartupArguments startup;
             try
             {
                 startup = StartupArguments.Parse(args);
-                if (!string.IsNullOrWhiteSpace(startup.DataDirectory))
-                {
-                    ServerPaths.UseDataDirectory(startup.DataDirectory);
-                }
-                else
-                {
-                    ServerPaths.UseDataDirectory(ServerPaths.DataDirectory);
-                }
+                ServerPaths.UseDataDirectory(string.IsNullOrWhiteSpace(startup.DataDirectory)
+                    ? ServerPaths.ResolveDefaultDataDirectory()
+                    : startup.DataDirectory);
             }
             catch (Exception ex)
             {

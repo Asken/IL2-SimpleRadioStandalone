@@ -74,8 +74,8 @@ else
                         <td>@key.Name</td>
                         <td class="mono nowrap">srs_@(key.Prefix)_…</td>
                         <td>@key.Scope</td>
-                        <td class="date">@Local(key.CreatedAtUtc)</td>
-                        <td class="date">@(key.LastUsedAtUtc.HasValue ? Local(key.LastUsedAtUtc.Value) : "never")</td>
+                        <td><LocalTime Value="key.CreatedAtUtc" /></td>
+                        <td class="date">@if (key.LastUsedAtUtc.HasValue) { <LocalTime Value="key.LastUsedAtUtc.Value" /> } else { <text>never</text> }</td>
                         <td class="actions-col">
                             @if (key.IsRevoked)
                             {
@@ -104,8 +104,6 @@ else
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
     protected override void OnInitialized() => _keys = Admin.GetApiKeys();
-
-    private static string Local(DateTime utc) => utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
     private void Create()
     {

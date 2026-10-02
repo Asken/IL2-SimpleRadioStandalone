@@ -74,9 +74,22 @@ else
                         <td class="mono nowrap">@ban.IpAddress</td>
                         <td>@(ban.PlayerName ?? "--")</td>
                         <td>@(ban.Reason ?? "--")</td>
-                        <td class="date">@Local(ban.CreatedAtUtc)</td>
+                        <td><LocalTime Value="ban.CreatedAtUtc" /></td>
                         <td>@ban.CreatedBy</td>
-                        <td class="date">@(ban.ExpiresAtUtc.HasValue ? (active ? Local(ban.ExpiresAtUtc.Value) : "expired") : "never")</td>
+                        <td class="date">
+                            @if (!ban.ExpiresAtUtc.HasValue)
+                            {
+                                <text>never</text>
+                            }
+                            else if (active)
+                            {
+                                <LocalTime Value="ban.ExpiresAtUtc.Value" />
+                            }
+                            else
+                            {
+                                <text>expired</text>
+                            }
+                        </td>
                         <td class="actions-col">
                             <ConfirmButton Text="Remove" Question="Remove ban?"
                                            ConfirmText="Remove" OnConfirm="() => Remove(ban)" />
@@ -100,8 +113,6 @@ else
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
     protected override void OnInitialized() => _bans = Admin.GetBans();
-
-    private static string Local(DateTime utc) => utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
     private void Add()
     {

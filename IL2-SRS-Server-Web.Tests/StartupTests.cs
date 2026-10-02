@@ -44,10 +44,23 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
-        public void DataDirectoryFallsBackWhenNotConfigured()
+        public void UsesTheApplicationFolderWhenItIsWritable()
         {
-            var fallback = Path.GetFullPath(Path.GetTempPath());
-            Assert.Equal(fallback, ServerPaths.ResolveDataDirectory("  ", fallback));
+            var app = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "srs-app"));
+            var programData = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "srs-programdata"));
+
+            Assert.Equal(app, ServerPaths.ChooseDefaultDataDirectory(app, programData, _ => true));
+            Assert.Equal(programData, ServerPaths.ChooseDefaultDataDirectory(app, programData, _ => false));
+            Assert.Equal(app, ServerPaths.ChooseDefaultDataDirectory(app, null, _ => false));
+        }
+
+        [Theory]
+        [InlineData(null, null, "http://127.0.0.1:8080/healthz")]
+        [InlineData(null, "9090;9091", "http://127.0.0.1:9090/healthz")]
+        [InlineData("http://127.0.0.1:1234/healthz", "8080", "http://127.0.0.1:1234/healthz")]
+        public void HealthCheckTargetsTheConfiguredHttpPort(string url, string ports, string expected)
+        {
+            Assert.Equal(expected, HealthCheckCommand.ResolveUrl(url, ports));
         }
 
         [Theory]

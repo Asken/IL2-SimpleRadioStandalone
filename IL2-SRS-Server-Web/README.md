@@ -8,15 +8,21 @@ been proven in production.
 What it adds over the WPF server:
 
 - Admin UI in the browser: health, clients (mute, kick, ban), settings, channel names, bans, event log and API keys.
+  Times are shown in each viewer's own time zone; the **Desktop / Light / Dark** button in the top bar
+  switches the theme (Desktop follows the system setting) and is remembered per browser.
 - SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
 - Event log of logins, admin actions, server start/stop and client connections, with automatic retention.
-- REST API with read and write API keys, described by an OpenAPI document.
+- REST API with read and write API keys, described by an OpenAPI document and browsable in the
+  Scalar API reference at `/scalar`.
+- Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
 
 ## Data directory
 
 Everything the server writes lives in one folder: `/data` in the container, otherwise the folder given
-with `--data-dir` (default: the application folder).
+with `--data-dir` or `SRS_DATA_DIR`. Without either, the application folder is used; on Windows, if that
+folder is not writable (for example under `C:\Program Files`), `C:\ProgramData\IL2-SRS-Server` is used
+instead. The first log line shows which folder is in use.
 
 | File | Purpose |
 | --- | --- |
@@ -56,27 +62,40 @@ Server setting names are those of `server.cfg` (`SERVER_PORT`, `COALITION_AUDIO_
 
 ## Docker
 
-```sh
-# From the repository root
-export SRS_ADMIN_PASSWORD='a-long-password'
-docker compose -f IL2-SRS-Server-Web/docker-compose.yml up -d --build
-```
-
-Or without compose:
+The image is published as [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server)
+(tags `preview` and `<version>-preview`, amd64).
 
 ```sh
-docker build -f IL2-SRS-Server-Web/Dockerfile -t il2-srs-server .
-docker run -d --name il2-srs --restart unless-stopped \
+docker run -d --name il2-srs-server --restart unless-stopped \
   -e SRS_ADMIN_PASSWORD='a-long-password' \
   -p 6002:6002/tcp -p 6002:6002/udp -p 127.0.0.1:8080:8080 \
-  -v il2-srs-data:/data il2-srs-server
+  -v il2-srs-data:/data asken/il2-srs-server:preview
 ```
+
+Or with the compose file in this folder (set `SRS_ADMIN_PASSWORD` in the shell or in a `.env` file next to it):
+
+```sh
+docker compose -f IL2-SRS-Server-Web/docker-compose.yml up -d
+```
+
+### Build from source
+
+```sh
+# From the repository root
+docker build -f IL2-SRS-Server-Web/Dockerfile -t il2-srs-server .
+```
+
+Then use `il2-srs-server` as the image name in the commands above.
+
+### Notes
 
 - Publish the SRS port for **both TCP and UDP**. If you change it with `SRS_SERVER_PORT`, change the published ports too.
 - The admin UI is plain HTTP on port 8080. Keep it on localhost, or put a reverse proxy with HTTPS
   (Caddy, Traefik, nginx) in front before exposing it.
 - To run several servers, run several containers with their own volume and ports.
-- `GET /healthz` returns `200 ok` while both listeners are running (and `503` while the server is stopped).
+- The image has a health check: `docker ps` shows the container as `healthy` while both SRS listeners
+  are running, and `unhealthy` if one fails or an admin stops the server from the UI. The same check is
+  available as `GET /healthz` (`200 ok` or `503`) for other monitoring.
 - The container runs as a non-root user. If you bind-mount a host folder instead of a named volume,
   it must be writable by UID 1654.
 
@@ -88,7 +107,7 @@ Publish a self-contained build (no .NET installation needed on the server):
 dotnet publish IL2-SRS-Server-Web -c Release -r win-x64 --self-contained -o C:\IL2-SRS\app
 ```
 
-Run it in a console:
+Run it in a console (without `--data-dir`, see [Data directory](#data-directory)):
 
 ```powershell
 $env:SRS_ADMIN_PASSWORD = 'a-long-password'
@@ -124,7 +143,11 @@ event log.
 
 Create keys under **API Keys** in the admin UI and send them as `Authorization: Bearer <key>` (or
 `X-Api-Key: <key>`). Read keys can use every `GET`; write keys can use everything. Keys cannot create
-other keys. The OpenAPI document is at `/openapi/v1.json`.
+other keys.
+
+- **API reference:** `/scalar`, for logged-in admins and linked from the **API Keys** page. Paste a key
+  into its authentication field to try requests from the browser.
+- **OpenAPI document:** `/openapi/v1.json`, public, for code generators and scripts.
 
 | Method and path | Scope | Purpose |
 | --- | --- | --- |

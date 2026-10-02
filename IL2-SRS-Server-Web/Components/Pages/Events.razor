@@ -63,7 +63,7 @@ else
                 @foreach (var auditEvent in _events)
                 {
                     <tr @key="auditEvent.Id">
-                        <td class="date">@auditEvent.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td><LocalTime Value="auditEvent.OccurredAtUtc" Format="seconds" /></td>
                         <td><span class="tag tag-@auditEvent.Category">@auditEvent.Category</span></td>
                         <td class="nowrap">@auditEvent.Actor</td>
                         <td>@auditEvent.Message</td>

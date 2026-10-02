@@ -22,20 +22,26 @@ The web server is new. The Windows server window remains available while the web
 - **Settings** and **Channel Names**, applied immediately and sent to connected clients.
 - **Bans** with reason, who banned, and expiry. Ban an IP address directly or remove a ban.
 - **Event log** of logins, admin actions, server start and stop, client connections and refused connections. Old events are removed automatically.
-- **API keys** for the REST API, with read-only or read-write access.
+- **API keys** for the REST API, with read-only or read-write access, and an interactive **API reference**.
+
+Times are shown in your own time zone. The **Desktop / Light / Dark** button in the top bar switches the theme; **Desktop** follows your system setting. The choice is remembered in each browser.
 
 Settings, bans, the event log and API keys are stored in `srs.db`, a SQLite database in the server's data folder.
 
 ## Run in Docker
 
-Build the image from the repository root and start it with an admin password:
+The image is published on Docker Hub as [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server). Start it with an admin password:
 
 ```sh
-export SRS_ADMIN_PASSWORD='a-long-password'
-docker compose -f IL2-SRS-Server-Web/docker-compose.yml up -d --build
+docker run -d --name il2-srs-server --restart unless-stopped \
+  -e SRS_ADMIN_PASSWORD='a-long-password' \
+  -p 6002:6002/tcp -p 6002:6002/udp -p 127.0.0.1:8080:8080 \
+  -v il2-srs-data:/data asken/il2-srs-server:preview
 ```
 
-The compose file publishes the SRS port `6002` for TCP and UDP, keeps the admin UI on `http://127.0.0.1:8080`, and stores data in a named volume.
+This publishes the SRS port `6002` for TCP and UDP, keeps the admin UI on `http://127.0.0.1:8080`, and stores data in a named volume. The repository also contains a `docker-compose.yml` with the same setup, and a `Dockerfile` if you prefer to build the image yourself.
+
+`docker ps` shows the container as `healthy` while both SRS listeners are running. It turns `unhealthy` if a listener fails, or while an admin has stopped the server from the dashboard.
 
 :::caution[Protect the admin UI]
 The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a reverse proxy with HTTPS (Caddy, Traefik, nginx) in front of it before exposing it to the internet.
@@ -59,7 +65,7 @@ The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a rever
 
 3. Open `http://localhost:8080` on the server and log in.
 
-To test without a service, run `IL2-SRS-Server.exe --data-dir C:\IL2-SRS\main` from a console with `SRS_ADMIN_PASSWORD` set.
+To test without a service, run `IL2-SRS-Server.exe --data-dir C:\IL2-SRS\main` from a console with `SRS_ADMIN_PASSWORD` set. Without `--data-dir`, the server keeps its data next to the exe, or in `C:\ProgramData\IL2-SRS-Server` when that folder is not writable (for example under `C:\Program Files`).
 
 ## Move an existing server
 
@@ -88,10 +94,12 @@ Create a key under **API Keys** in the admin UI and send it as `Authorization: B
 curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
 ```
 
-Read keys can view status, clients, settings, channel names, bans and events. Write keys can also change settings, kick, ban and mute clients, manage bans, clear the event log, and start, stop or restart the server. Every change made with a key is recorded in the event log under the key's name. The full API is described at `/openapi/v1.json`.
+Read keys can view status, clients, settings, channel names, bans and events. Write keys can also change settings, kick, ban and mute clients, manage bans, clear the event log, and start, stop or restart the server. Every change made with a key is recorded in the event log under the key's name.
+
+The **API reference** button on the API Keys page opens an interactive reference (`/scalar`) where you can paste a key and try requests from the browser. Scripts and code generators can use the OpenAPI document at `/openapi/v1.json`.
 
 ## Differences from the server window
 
 - UPnP port forwarding is not supported. Forward the SRS port (TCP and UDP) on your router or host.
 - The update checker is not included. Update the container image or the published files instead.
-- The White and Dark theme setting is replaced by the browser's light or dark preference.
+- The server-wide White and Dark theme is replaced by the per-browser Desktop / Light / Dark button.
