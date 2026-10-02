@@ -52,8 +52,20 @@ function Get-HubCredential {
     $store = if (Test-Path $configFile) { (Get-Content $configFile -Raw | ConvertFrom-Json).credsStore }
     if (-not $store) { return $null }
 
-    $stored = 'https://index.docker.io/v1/' | & "docker-credential-$store" get 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $stored) { return $null }
+    # Write the server URL without a trailing newline (piping from PowerShell would add one and the lookup fails).
+    $helper = New-Object System.Diagnostics.Process
+    $helper.StartInfo.FileName = "docker-credential-$store"
+    $helper.StartInfo.Arguments = 'get'
+    $helper.StartInfo.UseShellExecute = $false
+    $helper.StartInfo.RedirectStandardInput = $true
+    $helper.StartInfo.RedirectStandardOutput = $true
+    $helper.StartInfo.RedirectStandardError = $true
+    try { [void]$helper.Start() } catch { return $null }
+    $helper.StandardInput.Write('https://index.docker.io/v1/')
+    $helper.StandardInput.Close()
+    $stored = $helper.StandardOutput.ReadToEnd()
+    $helper.WaitForExit()
+    if ($helper.ExitCode -ne 0 -or -not $stored) { return $null }
 
     $credential = $stored | ConvertFrom-Json
     return @{ Username = $credential.Username; Secret = $credential.Secret; Source = 'docker login' }
