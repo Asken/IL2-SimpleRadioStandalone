@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings

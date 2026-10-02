@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;

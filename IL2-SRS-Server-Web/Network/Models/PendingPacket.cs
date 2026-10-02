@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Net.Sockets;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
 {
