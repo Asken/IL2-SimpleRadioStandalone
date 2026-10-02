@@ -1,0 +1,134 @@
+@page "/settings"
+@attribute [Authorize]
+@inherits LiveComponent
+
+<PageTitle>Settings · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Settings</h1>
+    @if (_restartNeeded && Admin.IsRunning)
+    {
+        <ConfirmButton Text="Restart to apply" Question="Restart now? Clients will reconnect." ConfirmText="Restart"
+                       ButtonClass="btn-primary" ConfirmClass="btn-primary" OnConfirm="Restart" />
+    }
+</div>
+
+<p class="muted">
+    Changes apply immediately and are sent to connected clients. Settings marked <span class="badge">locked</span>
+    are fixed by an <code>SRS_*</code> environment variable, command-line argument or <code>srs-server.json</code>.
+</p>
+
+@if (_error != null)
+{
+    <p class="alert alert-error" role="alert">@_error</p>
+}
+@if (_message != null)
+{
+    <p class="alert" role="status">@_message</p>
+}
+
+@foreach (var group in Groups)
+{
+    <section class="panel">
+        <h2>@group</h2>
+        <div class="settings">
+            @foreach (var definition in SettingDefinition.All.Where(d => d.Group == group && !d.Hidden))
+            {
+                var value = Admin.GetSetting(definition.Key);
+                <div class="setting">
+                    <div class="setting-text">
+                        <label for="@definition.Name" class="setting-label">
+                            @definition.Label
+                            @if (value.IsLocked)
+                            {
+                                <span class="badge" title="Set by SRS_@definition.Name">locked</span>
+                            }
+                            @if (definition.RequiresRestart)
+                            {
+                                <span class="badge badge-quiet" title="Applied when the server starts.">restart</span>
+                            }
+                        </label>
+                        <span class="setting-help">@definition.Description</span>
+                    </div>
+                    <div class="setting-control">
+                        @if (definition.Kind == SettingKind.Toggle)
+                        {
+                            <label class="switch">
+                                <input id="@definition.Name" type="checkbox" role="switch"
+                                       checked="@Admin.IsEnabled(definition)" disabled="@value.IsLocked"
+                                       @onchange="e => Toggle(definition, (bool)e.Value)" />
+                                <span class="switch-track" aria-hidden="true"></span>
+                            </label>
+                        }
+                        else
+                        {
+                            var draft = Draft(definition, value);
+                            <input id="@definition.Name"
+                                   type="@(definition.Kind == SettingKind.Number ? "number" : "text")"
+                                   min="@(definition.Kind == SettingKind.Number ? definition.Minimum.ToString(CultureInfo.InvariantCulture) : null)"
+                                   max="@(definition.Kind == SettingKind.Number ? definition.Maximum.ToString(CultureInfo.InvariantCulture) : null)"
+                                   class="@(definition.Kind == SettingKind.Number ? "input-narrow" : "")"
+                                   value="@draft" disabled="@value.IsLocked"
+                                   @oninput="e => _drafts[definition.Key] = e.Value?.ToString()" />
+                            <button type="button" class="btn btn-quiet"
+                                    disabled="@(value.IsLocked || draft == value.StringValue)"
+                                    @onclick="() => Save(definition)">Save</button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private static readonly string[] Groups =
+        { SettingDefinition.RadioGroup, SettingDefinition.ClientGroup, SettingDefinition.ServerGroup };
+
+    private readonly Dictionary<ServerSettingsKeys, string> _drafts = new Dictionary<ServerSettingsKeys, string>();
+    private string _error;
+    private string _message;
+    private bool _restartNeeded;
+
+    protected override bool RefreshEverySecond => false;
+
+    private string Draft(SettingDefinition definition, SettingValue value) =>
+        _drafts.TryGetValue(definition.Key, out var draft) ? draft : value.StringValue;
+
+    private void Toggle(SettingDefinition definition, bool enabled)
+    {
+        Report(definition, Admin.SetEnabled(definition, enabled, Actor));
+    }
+
+    private void Save(SettingDefinition definition)
+    {
+        if (_drafts.TryGetValue(definition.Key, out var draft))
+        {
+            var error = Admin.SetSetting(definition.Key, draft, Actor);
+            if (error == null)
+            {
+                _drafts.Remove(definition.Key);
+            }
+
+            Report(definition, error);
+        }
+    }
+
+    private void Report(SettingDefinition definition, string error)
+    {
+        _error = error;
+        _message = error == null ? $"Saved {definition.Label}." : null;
+        if (error == null && definition.RequiresRestart)
+        {
+            _restartNeeded = true;
+            _message += " It applies after the server restarts.";
+        }
+    }
+
+    private void Restart()
+    {
+        _error = Admin.Restart(Actor);
+        _message = _error == null ? $"Server restarted on port {Admin.Port}." : null;
+        _restartNeeded = _error != null;
+    }
+}

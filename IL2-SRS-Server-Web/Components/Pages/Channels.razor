@@ -1,0 +1,62 @@
+@page "/channels"
+@attribute [Authorize]
+@inject ServerAdminService Admin
+@inject AdminAuthOptions AuthOptions
+
+<PageTitle>Channel Names · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Channel Names</h1>
+    <div class="actions">
+        <button type="button" class="btn btn-quiet" @onclick="Load">Reset</button>
+        <button type="button" class="btn btn-primary" @onclick="Save">Save</button>
+    </div>
+</div>
+
+<p class="muted">Names are optional. Blank channels use their standard channel number. Up to @ChannelNameSettings.MaximumNameLength characters.</p>
+
+@if (_message != null)
+{
+    <p class="alert" role="status">@_message</p>
+}
+
+<section class="panel">
+    <div class="channel-grid">
+        @for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
+        {
+            var number = channel;
+            <label class="channel-row">
+                <span class="channel-number mono">@number.ToString("00")</span>
+                <input type="text" maxlength="@ChannelNameSettings.MaximumNameLength" placeholder="Channel @number"
+                       value="@_names[number]" @oninput="e => _names[number] = e.Value?.ToString()" />
+            </label>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+    private string _message;
+
+    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        var configured = Admin.GetChannelNames();
+        for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
+        {
+            _names[channel] = configured.TryGetValue(channel, out var name) ? name : string.Empty;
+        }
+
+        _message = null;
+    }
+
+    private void Save()
+    {
+        Admin.SetChannelNames(_names, Actor);
+        Load();
+        _message = "Channel names saved and sent to connected clients.";
+    }
+}

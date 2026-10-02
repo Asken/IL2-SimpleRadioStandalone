@@ -1,0 +1,284 @@
+using System;
+using System.Globalization;
+using System.IO;
+using System.Runtime;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Components;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using NLog;
+using NLog.Web;
+using Scalar.AspNetCore;
+
+namespace Ciribob.IL2.SimpleRadio.Standalone.Server
+{
+    public static class Program
+    {
+        public const string ServiceName = "IL2-SRS-Server";
+        public const string ConfigFileName = "srs-server.json";
+        public const string DefaultLocalUrl = "http://localhost:8080";
+
+        public static int Main(string[] args)
+        {
+            StartupArguments startup;
+            try
+            {
+                startup = StartupArguments.Parse(args);
+                if (!string.IsNullOrWhiteSpace(startup.DataDirectory))
+                {
+                    ServerPaths.UseDataDirectory(startup.DataDirectory);
+                }
+                else
+                {
+                    ServerPaths.UseDataDirectory(ServerPaths.DataDirectory);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 2;
+            }
+
+            LogManager.Configuration = ServerLogging.Create(ServerPaths.DataDirectory);
+            var logger = LogManager.GetCurrentClassLogger();
+
+            try
+            {
+                GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+                logger.Info($"IL2-SRS Server starting. Data directory: {ServerPaths.DataDirectory}");
+
+                var app = BuildApp(startup);
+                app.Run();
+                return Environment.ExitCode;
+            }
+            catch (Exception ex) when (FindStartupException(ex) is ServerStartupException startupError)
+            {
+                logger.Fatal("IL2-SRS Server cannot start: " + startupError.Message +
+                             (startupError.InnerException != null ? " (" + startupError.InnerException.Message + ")" : string.Empty));
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                logger.Fatal(ex, "IL2-SRS Server stopped because of an error: " + ex.Message);
+                return 1;
+            }
+            finally
+            {
+                LogManager.Shutdown();
+            }
+        }
+
+        public static WebApplication BuildApp(StartupArguments startup)
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                Args = startup.HostArguments,
+                // A Windows service starts in System32; always serve from the install folder.
+                ContentRootPath = AppContext.BaseDirectory
+            });
+
+            // Same SRS_* keys as environment variables, for hosts where those are awkward (Windows services).
+            builder.Configuration.AddJsonFile(Path.Combine(ServerPaths.DataDirectory, ConfigFileName), optional: true,
+                reloadOnChange: false);
+            builder.Configuration.AddEnvironmentVariables();
+            builder.Configuration.AddCommandLine(startup.HostArguments);
+
+            builder.Logging.ClearProviders();
+            builder.Host.UseNLog();
+            builder.Services.AddWindowsService(options => options.ServiceName = ServiceName);
+
+            if (string.IsNullOrEmpty(builder.Configuration["urls"]) &&
+                string.IsNullOrEmpty(builder.Configuration["http_ports"]) &&
+                string.IsNullOrEmpty(builder.Configuration["https_ports"]))
+            {
+                // Outside a container, only listen locally unless told otherwise.
+                builder.WebHost.UseUrls(DefaultLocalUrl);
+            }
+
+            var adminAuth = AdminAuthOptions.FromConfiguration(builder.Configuration);
+            if (adminAuth.Disabled)
+            {
+                LogManager.GetCurrentClassLogger().Warn(
+                    $"{AdminAuthOptions.DisabledKey}=true: the admin UI is not password protected. Restrict access to it another way.");
+            }
+
+            AddServerData(builder.Services, builder.Configuration, startup);
+
+            builder.Services.AddSingleton(adminAuth);
+            builder.Services.AddSingleton<ServerEvents>();
+            builder.Services.AddSingleton<ServerState>();
+            builder.Services.AddSingleton<ServerEventAuditor>();
+            builder.Services.AddSingleton<ServerAdminService>();
+            // Registered first so it stops last and stores the shutdown events.
+            builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());
+            builder.Services.AddHostedService<SrsServerHostedService>();
+
+            // Keep login cookies valid across restarts.
+            builder.Services.AddDataProtection()
+                .SetApplicationName(ServiceName)
+                .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(ServerPaths.DataDirectory, "keys")));
+
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.LoginPath = "/login";
+                    options.Cookie.Name = "il2srs.admin";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SameSite = SameSiteMode.Strict;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+                    options.SlidingExpiration = true;
+                })
+                .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+                    ApiKeyAuthenticationHandler.SchemeName, null);
+
+            builder.Services.AddAuthorization(options =>
+            {
+                if (adminAuth.Disabled)
+                {
+                    options.DefaultPolicy = new AuthorizationPolicyBuilder().RequireAssertion(_ => true).Build();
+                }
+
+                options.AddPolicy(ApiKeyAuthenticationHandler.ReadPolicy, policy => policy
+                    .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                    .RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, ApiScope.Read, ApiScope.Write));
+                options.AddPolicy(ApiKeyAuthenticationHandler.WritePolicy, policy => policy
+                    .AddAuthenticationSchemes(ApiKeyAuthenticationHandler.SchemeName)
+                    .RequireClaim(ApiKeyAuthenticationHandler.ScopeClaim, ApiScope.Write));
+            });
+            builder.Services.AddCascadingAuthenticationState();
+            builder.Services.AddAdminLoginRateLimiting();
+            builder.Services.AddOpenApi(options => options.AddDocumentTransformer<ApiKeyOpenApiTransformer>());
+
+            builder.Services.AddRazorComponents()
+                .AddInteractiveServerComponents();
+
+            var app = builder.Build();
+
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseExceptionHandler("/error", createScopeForErrors: true);
+            }
+
+            // Friendly "not found" page for the admin UI only; API, login and health responses keep their own bodies.
+            app.UseWhen(context => !IsMachineEndpoint(context.Request.Path),
+                branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseRateLimiter();
+            app.UseAntiforgery();
+
+            // Named explicitly so the manifest is found when another assembly (e.g. tests) is the entry point.
+            var staticAssetsManifest = Path.Combine(AppContext.BaseDirectory,
+                typeof(Program).Assembly.GetName().Name + ".staticwebassets.endpoints.json");
+            if (File.Exists(staticAssetsManifest))
+            {
+                app.MapStaticAssets(staticAssetsManifest);
+            }
+
+            app.MapOpenApi().AllowAnonymous();
+            // Interactive API reference; admins paste an API key to try requests.
+            app.MapScalarApiReference("/scalar", options => options
+                    .WithTitle("IL2-SRS Server API")
+                    .AddPreferredSecuritySchemes(ApiKeyOpenApiTransformer.SchemeName))
+                .RequireAuthorization();
+            app.MapAdminEndpoints();
+            app.MapServerApi();
+            app.MapRazorComponents<App>()
+                .AddInteractiveServerRenderMode();
+
+            return app;
+        }
+
+        private static void AddServerData(IServiceCollection services, IConfiguration configuration,
+            StartupArguments startup)
+        {
+            var database = new SrsDatabase(ServerPaths.Resolve(SrsDatabase.FileName));
+            var settings = new ServerSettingsStore(database, ServerSettingsStore.ReadOverrides(configuration));
+            var bans = new BanStore(database);
+
+            if (database.WasCreated)
+            {
+                LegacyFileImporter.ImportServerConfig(
+                    ServerPaths.Resolve(string.IsNullOrWhiteSpace(startup.ImportConfigFile)
+                        ? "server.cfg"
+                        : startup.ImportConfigFile),
+                    settings);
+                LegacyFileImporter.ImportBannedIps(ServerPaths.Resolve("banned.txt"), bans);
+            }
+            else if (!string.IsNullOrWhiteSpace(startup.ImportConfigFile))
+            {
+                LogManager.GetCurrentClassLogger().Warn(
+                    $"-cfg={startup.ImportConfigFile} ignored: settings are only imported when {SrsDatabase.FileName} is first created.");
+            }
+
+            ServerSettingsStore.Instance = settings;
+
+            services.AddSingleton(database);
+            services.AddSingleton(settings);
+            services.AddSingleton(bans);
+            services.AddSingleton(new ApiKeyStore(database));
+            services.AddSingleton(new AuditRetention
+            {
+                Days = ReadPositiveInt(configuration, AuditRetention.DaysKey, 30),
+                MaxRows = ReadPositiveInt(configuration, AuditRetention.MaxRowsKey, 100_000)
+            });
+            services.AddSingleton<AuditLog>();
+        }
+
+        private static bool IsMachineEndpoint(PathString path)
+        {
+            return path.StartsWithSegments("/api") || path.StartsWithSegments("/account") ||
+                   path.StartsWithSegments("/healthz") || path.StartsWithSegments("/openapi");
+        }
+
+        private static ServerStartupException FindStartupException(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current is ServerStartupException startupException)
+                {
+                    return startupException;
+                }
+
+                if (current is AggregateException aggregate && aggregate.InnerExceptions.Count == 1)
+                {
+                    return FindStartupException(aggregate.InnerExceptions[0]);
+                }
+            }
+
+            return null;
+        }
+
+        private static int ReadPositiveInt(IConfiguration configuration, string key, int defaultValue)
+        {
+            var value = configuration[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return defaultValue;
+            }
+
+            if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) || number < 1)
+            {
+                throw new ServerStartupException($"{key} must be a positive whole number.");
+            }
+
+            return number;
+        }
+    }
+}

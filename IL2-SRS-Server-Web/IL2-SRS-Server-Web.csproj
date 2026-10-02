@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>IL2-SRS-Server</AssemblyName>
+    <RootNamespace>Ciribob.IL2.SimpleRadio.Standalone.Server</RootNamespace>
+    <!-- The network code and IL2-SR-Common are shared with the .NET Framework 4.8 projects,
+         so keep the language defaults they compile under. -->
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="IL2-SRS-Server-Web.Tests" />
+  </ItemGroup>
+
+  <!-- IL2-SR-Common stays a .NET Framework project for the WPF client; compile its portable sources here. -->
+  <ItemGroup>
+    <Compile Include="..\IL2-SR-Common\**\*.cs"
+             Exclude="..\IL2-SR-Common\bin\**;..\IL2-SR-Common\obj\**;..\IL2-SR-Common\Properties\**;..\IL2-SR-Common\Timers\**;..\IL2-SR-Common\Network\UpdaterChecker.cs;..\IL2-SR-Common\Network\Analytics.cs"
+             Link="Common\%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\IL2-SR-Common\Data\AirfieldCodes.json"
+                      LogicalName="Ciribob.IL2.SimpleRadio.Standalone.Common.Data.AirfieldCodes.json"
+                      Link="Common\Data\AirfieldCodes.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Published next to IL2-SRS-Server.exe for Windows service installs. -->
+    <None Include="scripts\Install-WindowsService.ps1" Link="Install-WindowsService.ps1"
+          CopyToOutputDirectory="Never" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="NLog" Version="6.2.1" />
+    <PackageReference Include="NLog.Web.AspNetCore" Version="6.2.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.17.13" />
+    <!-- Only used to import server.cfg from the WPF server; 3.x is the version that wrote those files. -->
+    <PackageReference Include="sharpconfig" Version="3.2.9.1" />
+  </ItemGroup>
+
+</Project>

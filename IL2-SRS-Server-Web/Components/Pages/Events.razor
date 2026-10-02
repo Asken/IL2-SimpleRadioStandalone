@@ -1,0 +1,102 @@
+@page "/events"
+@attribute [Authorize]
+@inject ServerAdminService Admin
+@inject AdminAuthOptions AuthOptions
+
+<PageTitle>Event Log · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Event Log</h1>
+    <div class="actions">
+        <button type="button" class="btn btn-quiet" @onclick="Load">Refresh</button>
+        <ConfirmButton Text="Clear Log" Question="Delete all stored events?" ConfirmText="Clear" OnConfirm="Clear" />
+    </div>
+</div>
+
+<p class="muted">
+    @_total stored events. Events older than @Admin.Audit.Retention.Days days, or beyond the newest
+    @Admin.Audit.Retention.MaxRows.ToString("N0", CultureInfo.InvariantCulture), are removed automatically.
+</p>
+
+<div class="filters">
+    <label>
+        <span>Search</span>
+        <input type="search" placeholder="Message or actor" @bind="Search" @bind:event="oninput" @bind:after="Load" />
+    </label>
+    <label>
+        <span>Category</span>
+        <select @bind="Category" @bind:after="Load">
+            <option value="">All</option>
+            @foreach (var category in AuditCategory.All)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    </label>
+    <label>
+        <span>Show</span>
+        <select @bind="Limit" @bind:after="Load">
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+        </select>
+    </label>
+</div>
+
+@if (_events.Count == 0)
+{
+    <p class="muted empty">No events.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Category</th>
+                    <th>Actor</th>
+                    <th>Event</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var auditEvent in _events)
+                {
+                    <tr @key="auditEvent.Id">
+                        <td class="date">@auditEvent.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td><span class="tag tag-@auditEvent.Category">@auditEvent.Category</span></td>
+                        <td class="nowrap">@auditEvent.Actor</td>
+                        <td>@auditEvent.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<AuditEvent> _events = Array.Empty<AuditEvent>();
+    private long _total;
+
+    private string Search { get; set; }
+    private string Category { get; set; } = string.Empty;
+    private int Limit { get; set; } = 100;
+
+    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        _events = Admin.Audit.Query(Category, Search, null, Limit);
+        _total = Admin.Audit.Count();
+    }
+
+    private async Task Clear()
+    {
+        Admin.Audit.Clear(Actor);
+        // Give the background writer a moment to store the "cleared" event.
+        await Task.Delay(300);
+        Load();
+    }
+}

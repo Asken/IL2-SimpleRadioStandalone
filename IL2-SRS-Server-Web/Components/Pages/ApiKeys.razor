@@ -1,0 +1,133 @@
+@page "/api-keys"
+@attribute [Authorize]
+@inject ServerAdminService Admin
+@inject AdminAuthOptions AuthOptions
+
+<PageTitle>API Keys · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>API Keys</h1>
+    <div class="actions">
+        <a class="btn btn-quiet" href="scalar" target="_blank" rel="noopener">API reference</a>
+        <a class="btn btn-quiet" href="openapi/v1.json" target="_blank" rel="noopener">OpenAPI document</a>
+    </div>
+</div>
+
+<p class="muted">
+    Send a key as <code>Authorization: Bearer &lt;key&gt;</code> to <code>/api/v1/…</code>.
+    <strong>Read</strong> keys can view status, clients, settings, bans and events.
+    <strong>Write</strong> keys can also change settings, kick, ban and mute, and start or stop the server.
+    Use HTTPS (for example a reverse proxy) when keys are sent over the internet.
+</p>
+
+<section class="panel">
+    <h2>Create a key</h2>
+    <form class="inline-form" @onsubmit="Create">
+        <label class="grow">
+            <span>Name</span>
+            <input type="text" required maxlength="64" placeholder="Discord bot" @bind="_name" />
+        </label>
+        <label>
+            <span>Access</span>
+            <select @bind="_scope">
+                <option value="@ApiScope.Read">Read</option>
+                <option value="@ApiScope.Write">Write</option>
+            </select>
+        </label>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </form>
+    @if (_error != null)
+    {
+        <p class="alert alert-error" role="alert">@_error</p>
+    }
+    @if (_newKey != null)
+    {
+        <div class="alert new-key" role="status">
+            <p><strong>Copy this key now.</strong> It is not stored and cannot be shown again.</p>
+            <code class="key">@_newKey</code>
+        </div>
+    }
+</section>
+
+@if (_keys.Count == 0)
+{
+    <p class="muted empty">No API keys.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Key</th>
+                    <th>Access</th>
+                    <th>Created</th>
+                    <th>Last used</th>
+                    <th class="actions-col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var key in _keys)
+                {
+                    <tr @key="key.Id" class="@(key.IsRevoked ? "row-muted" : "")">
+                        <td>@key.Name</td>
+                        <td class="mono nowrap">srs_@(key.Prefix)_…</td>
+                        <td>@key.Scope</td>
+                        <td class="date">@Local(key.CreatedAtUtc)</td>
+                        <td class="date">@(key.LastUsedAtUtc.HasValue ? Local(key.LastUsedAtUtc.Value) : "never")</td>
+                        <td class="actions-col">
+                            @if (key.IsRevoked)
+                            {
+                                <span class="muted">revoked</span>
+                            }
+                            else
+                            {
+                                <ConfirmButton Text="Revoke" Question="Revoke key?" ConfirmText="Revoke"
+                                               OnConfirm="() => Revoke(key)" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ApiKeyRecord> _keys = Array.Empty<ApiKeyRecord>();
+    private string _name;
+    private string _scope = ApiScope.Read;
+    private string _newKey;
+    private string _error;
+
+    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+
+    protected override void OnInitialized() => _keys = Admin.GetApiKeys();
+
+    private static string Local(DateTime utc) => utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private void Create()
+    {
+        _error = null;
+        try
+        {
+            _newKey = Admin.CreateApiKey(_name, _scope, Actor, out _);
+            _name = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _newKey = null;
+            _error = ex.Message;
+        }
+
+        _keys = Admin.GetApiKeys();
+    }
+
+    private void Revoke(ApiKeyRecord key)
+    {
+        Admin.RevokeApiKey(key.Id, Actor);
+        _newKey = null;
+        _keys = Admin.GetApiKeys();
+    }
+}

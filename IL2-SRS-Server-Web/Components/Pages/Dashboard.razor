@@ -1,0 +1,134 @@
+@page "/"
+@attribute [Authorize]
+@inherits LiveComponent
+
+<PageTitle>Dashboard · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Server Health</h1>
+    <div class="actions">
+        @if (_health.Status == "STOPPED")
+        {
+            <button type="button" class="btn btn-primary" @onclick="Start">Start Server</button>
+        }
+        else
+        {
+            <ConfirmButton Text="Restart" Question="Restart? Clients will reconnect." ConfirmText="Restart"
+                           OnConfirm="Restart" />
+            <ConfirmButton Text="Stop Server" Question="Stop the server? Connected clients will be disconnected."
+                           ConfirmText="Stop" ButtonClass="btn-danger-outline" OnConfirm="Stop" />
+        }
+    </div>
+</div>
+
+@if (_error != null)
+{
+    <p class="alert alert-error" role="alert">@_error</p>
+}
+
+<section class="tiles" aria-label="Server health">
+    <div class="tile">
+        <span class="tile-label">Service</span>
+        <span class="tile-value status status-@_health.Status.ToLowerInvariant()">@_health.Status</span>
+    </div>
+    <div class="tile">
+        <span class="tile-label">Port</span>
+        <span class="tile-value">@Admin.Port</span>
+    </div>
+    <div class="tile">
+        <span class="tile-label">Uptime</span>
+        <span class="tile-value mono">@_health.Uptime</span>
+    </div>
+    <div class="tile">
+        <span class="tile-label">Clients</span>
+        <span class="tile-value">@_health.Clients</span>
+    </div>
+    <div class="tile" title="Clients that have completed the UDP voice handshake.">
+        <span class="tile-label">Voice Links</span>
+        <span class="tile-value">@_health.VoiceLinks</span>
+    </div>
+    <div class="tile" title="Clients that transmitted during the last two seconds.">
+        <span class="tile-label">Recent TX</span>
+        <span class="tile-value">@_health.RecentTransmitters</span>
+    </div>
+    <div class="tile" title="Memory currently used by the server process.">
+        <span class="tile-label">Memory</span>
+        <span class="tile-value">@_health.Memory</span>
+    </div>
+    <div class="tile">
+        <span class="tile-label">Active Bans</span>
+        <span class="tile-value">@Admin.ActiveBanCount</span>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Recent Activity</h2>
+        <a href="events">Full event log</a>
+    </div>
+    @if (_recent.Count == 0)
+    {
+        <p class="muted">No events yet.</p>
+    }
+    else
+    {
+        <ul class="event-list">
+            @foreach (var auditEvent in _recent)
+            {
+                <li>
+                    <time class="date muted" datetime="@auditEvent.OccurredAtUtc.ToString("O")">@auditEvent.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss")</time>
+                    <span class="tag tag-@auditEvent.Category">@auditEvent.Category</span>
+                    <span>@auditEvent.Message</span>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private ServerHealthSnapshot _health;
+    private IReadOnlyList<AuditEvent> _recent = Array.Empty<AuditEvent>();
+    private string _error;
+    private int _tick;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Load();
+    }
+
+    protected override void OnLiveRefresh()
+    {
+        _health = Admin.GetHealth();
+        // The event log is in the database; read it every few seconds rather than every tick.
+        if (++_tick % 3 == 0)
+        {
+            _recent = Admin.Audit.Query(limit: 12);
+        }
+    }
+
+    private void Load()
+    {
+        _health = Admin.GetHealth();
+        _recent = Admin.Audit.Query(limit: 12);
+    }
+
+    private void Start()
+    {
+        _error = Admin.Start(Actor);
+        Load();
+    }
+
+    private void Stop()
+    {
+        _error = null;
+        Admin.Stop(Actor);
+        Load();
+    }
+
+    private void Restart()
+    {
+        _error = Admin.Restart(Actor);
+        Load();
+    }
+}

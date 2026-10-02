@@ -1,0 +1,166 @@
+@page "/clients"
+@attribute [Authorize]
+@inherits LiveComponent
+
+<PageTitle>Clients · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Client Administration</h1>
+    <span class="muted">@_visible.Count shown / @_all.Count connected</span>
+</div>
+
+<div class="filters">
+    <label>
+        <span>Search</span>
+        <input type="search" placeholder="Name, callsign, channel" @bind="_search" @bind:event="oninput" />
+    </label>
+    <label>
+        <span>Coalition</span>
+        <select @bind="_coalition">
+            @foreach (var filter in ClientAdminPresentation.CoalitionFilters)
+            {
+                <option value="@filter">@filter</option>
+            }
+        </select>
+    </label>
+</div>
+
+@if (_message != null)
+{
+    <p class="alert" role="status">@_message</p>
+}
+
+@if (_visible.Count == 0)
+{
+    <p class="muted empty">@(_all.Count == 0 ? "No clients connected." : "No clients match the filter.")</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Side</th>
+                    <th>Pilot</th>
+                    <th>Callsign</th>
+                    <th class="num">R1</th>
+                    <th class="num">R2</th>
+                    <th title="UDP voice-link status">Voice</th>
+                    <th>Last TX</th>
+                    <th class="actions-col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var client in _visible)
+                {
+                    var coalition = ClientAdminPresentation.GetCoalitionName(client.Coalition);
+                    <tr @key="client.ClientGuid">
+                        <td><span class="dot dot-@coalition.ToLowerInvariant()" title="@coalition"></span><span class="sr-only">@coalition</span></td>
+                        <td>@client.Name</td>
+                        <td>@Fallback(client.AssignedCallsign)</td>
+                        <td class="num">@ClientAdminPresentation.FormatRadioChannel(client.GameState, 1)</td>
+                        <td class="num">@ClientAdminPresentation.FormatRadioChannel(client.GameState, 2)</td>
+                        <td>
+                            <span class="pill @(client.VoipPort != null ? "pill-ok" : "pill-wait")">@(client.VoipPort != null ? "READY" : "WAITING")</span>
+                        </td>
+                        <td class="mono @(IsTransmitting(client) ? "tx-live" : "muted")">@Fallback(client.TransmittingFrequency)</td>
+                        <td class="actions-col">
+                            <button type="button" class="btn btn-quiet @(client.Muted ? "is-on" : "")"
+                                    title="Mute or unmute this client on the server."
+                                    @onclick="() => ToggleMute(client)">@(client.Muted ? "Unmute" : "Mute")</button>
+                            <ConfirmButton Text="Kick" Question="Kick?" ConfirmText="Kick"
+                                           OnConfirm="() => Kick(client)" />
+                            @if (_banning == client.ClientGuid)
+                            {
+                                <span class="ban-form">
+                                    <input type="text" placeholder="Reason (optional)" maxlength="200" @bind="_banReason" />
+                                    <select @bind="_banMinutes" aria-label="Ban duration">
+                                        <option value="0">Permanent</option>
+                                        <option value="60">1 hour</option>
+                                        <option value="1440">1 day</option>
+                                        <option value="10080">7 days</option>
+                                        <option value="43200">30 days</option>
+                                    </select>
+                                    <button type="button" class="btn btn-danger" @onclick="() => Ban(client)">Ban</button>
+                                    <button type="button" class="btn btn-quiet" @onclick="() => _banning = null">Cancel</button>
+                                </span>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-quiet" title="Ban and disconnect this client."
+                                        @onclick="() => StartBan(client)">Ban</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly TimeSpan TransmitWindow = TimeSpan.FromSeconds(2);
+
+    private IReadOnlyList<SRClient> _all = Array.Empty<SRClient>();
+    private string _search = string.Empty;
+    private string _coalition = ClientAdminPresentation.AllCoalitions;
+    private string _message;
+    private string _banning;
+    private string _banReason;
+    private int _banMinutes;
+
+    private List<SRClient> _visible => _all
+        .Where(client => ClientAdminPresentation.Matches(client, _search, _coalition))
+        .OrderBy(client => client.Coalition)
+        .ThenBy(client => client.Name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _all = Admin.GetClients();
+    }
+
+    protected override void OnLiveRefresh()
+    {
+        _all = Admin.GetClients();
+    }
+
+    private static string Fallback(string value) =>
+        string.IsNullOrWhiteSpace(value) || value == "---" ? "--" : value;
+
+    private static bool IsTransmitting(SRClient client) =>
+        client.LastTransmissionReceived != default &&
+        DateTime.Now - client.LastTransmissionReceived <= TransmitWindow;
+
+    private void ToggleMute(SRClient client)
+    {
+        Admin.SetClientMuted(client.ClientGuid, !client.Muted, Actor);
+    }
+
+    private void Kick(SRClient client)
+    {
+        _message = Admin.KickClient(client.ClientGuid, Actor)
+            ? $"Disconnected {client.Name}."
+            : $"{client.Name} is no longer connected.";
+        _all = Admin.GetClients();
+    }
+
+    private void StartBan(SRClient client)
+    {
+        _banning = client.ClientGuid;
+        _banReason = null;
+        _banMinutes = 0;
+    }
+
+    private void Ban(SRClient client)
+    {
+        var ban = Admin.BanClient(client.ClientGuid, _banReason,
+            _banMinutes > 0 ? TimeSpan.FromMinutes(_banMinutes) : null, Actor);
+        _message = ban != null
+            ? $"Banned {client.Name} ({ban.IpAddress})."
+            : $"{client.Name} is no longer connected.";
+        _banning = null;
+        _all = Admin.GetClients();
+    }
+}
