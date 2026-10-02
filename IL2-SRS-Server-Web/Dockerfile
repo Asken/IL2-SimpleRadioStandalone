@@ -10,16 +10,21 @@ COPY IL2-SRS-Server-Web/ IL2-SRS-Server-Web/
 RUN dotnet restore IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj
 
 COPY IL2-SR-Common/ IL2-SR-Common/
-RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /app --no-restore
+RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /app --no-restore \
+    && rm -f /app/Install-WindowsService.ps1 /app/web.config \
+    && mkdir -p /data
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+# Alpine (musl): a minimal base without the Ubuntu packages the server never uses
+# (login, tar, ICU, systemd libraries, ...), which carried unfixable scanner findings.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
 
 ENV SRS_DATA_DIR=/data \
     ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_gcServer=0
 
-RUN mkdir -p /data && chown "$APP_UID" /data
+# The empty data folder is copied in, owned by the image's non-root "app" user (UID 1654, $APP_UID).
+COPY --from=build --chown=1654:1654 /data /data
 VOLUME /data
 
 COPY --from=build /app .
