@@ -117,7 +117,7 @@ try {
 }
 catch {
     throw "The image is pushed, but Docker Hub did not accept the $($hubCredential.Source) credential for updating the page " +
-          "($($_.Exception.Message)). Set DOCKERHUB_TOKEN to a personal access token with Read & Write access and run the script again."
+          "($($_.Exception.Message)). Set DOCKERHUB_TOKEN to a personal access token with 'Read, Write, Delete' access and run the script again."
 }
 
 $body = @{
