@@ -1,0 +1,44 @@
+@inherits LayoutComponentBase
+@inject ServerAdminService Admin
+@inject AdminAuthOptions AuthOptions
+
+<div class="shell">
+    <header class="topbar">
+        <a class="brand" href="">
+            <img src="favicon.ico" alt="" width="24" height="24" />
+            <span>IL2-SRS Server</span>
+        </a>
+        <span class="topbar-meta">v@(Admin.Version) · port @Admin.Port</span>
+        <button type="button" class="btn btn-quiet theme-toggle" data-theme-toggle aria-label="Theme">
+            <Icon Name="monitor" Class="theme-label theme-label-desktop" />
+            <Icon Name="sun" Class="theme-label theme-label-light" />
+            <Icon Name="moon" Class="theme-label theme-label-dark" />
+        </button>
+        @if (!AuthOptions.Disabled)
+        {
+            <form method="post" action="account/logout" class="logout">
+                <AntiforgeryToken />
+                <button type="submit" class="btn btn-quiet">Log out</button>
+            </form>
+        }
+    </header>
+
+    <nav class="sidenav" aria-label="Main">
+        <NavLink href="" Match="NavLinkMatch.All">Dashboard</NavLink>
+        <NavLink href="clients">Clients</NavLink>
+        <NavLink href="settings">Settings</NavLink>
+        <NavLink href="channels">Channel Names</NavLink>
+        <NavLink href="bans">Bans</NavLink>
+        <NavLink href="events">Event Log</NavLink>
+        <NavLink href="api-keys">API Keys</NavLink>
+    </nav>
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    The connection to the server was interrupted.
+    <a href="" class="reload">Reload</a>
+</div>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <base href="/" />
+    <title>IL2-SRS Server</title>
+    <link rel="icon" href="favicon.ico" />
+    <script src="@Assets["app.js"]"></script>
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageRenderMode" />
+
+    @* Replaces Blazor's default reconnect popup; blazor.web.js toggles the components-reconnect-* classes. *@
+    <div id="components-reconnect-modal" class="reconnect" data-nosnippet aria-live="polite">
+        <div class="reconnect-card" role="status">
+            <span class="reconnect-spinner" aria-hidden="true"></span>
+            <p class="reconnect-text reconnect-retrying">Connection to the server lost. Reconnecting…</p>
+            <p class="reconnect-text reconnect-failed">Could not reconnect to the server.</p>
+            <p class="reconnect-text reconnect-rejected">The server restarted. Reloading…</p>
+            <a class="btn btn-primary reconnect-reload" href="">Reload page</a>
+        </div>
+    </div>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; }
+
+    // The login and error pages are plain server-rendered forms; everything else is interactive.
+    private IComponentRenderMode PageRenderMode =>
+        HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
+}

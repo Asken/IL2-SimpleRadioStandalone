@@ -38,7 +38,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Network
 
         public string Encode()
         {
-            Version = UpdaterChecker.VERSION;
+            Version = ReleaseMetadata.Version;
             ServerType = "IL2-SRS";
             return JsonConvert.SerializeObject(this, JsonSerializerSettings) + "\n";
 

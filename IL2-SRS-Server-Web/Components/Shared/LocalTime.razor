@@ -1,0 +1,11 @@
+@* A UTC timestamp shown in the viewer's own time zone (formatted by <local-time> in app.js). *@
+<local-time class="date @Class" datetime="@Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)" format="@Format"></local-time>
+
+@code {
+    [Parameter, EditorRequired] public DateTime Value { get; set; }
+
+    /// <summary>"datetime" (yyyy-MM-dd HH:mm), "seconds" (yyyy-MM-dd HH:mm:ss) or "time" (HH:mm:ss).</summary>
+    [Parameter] public string Format { get; set; } = "datetime";
+
+    [Parameter] public string Class { get; set; }
+}

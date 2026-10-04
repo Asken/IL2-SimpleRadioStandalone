@@ -1,0 +1,191 @@
+# IL2-SRS Server (web)
+
+The IL2-SRS server as a .NET 10 application with a browser-based admin UI and a REST API. It runs in
+Docker or directly on Windows (console or Windows service), and is wire-compatible with existing IL2-SRS
+clients. It replaces the WPF server window; the WPF server stays in the repository until this one has
+been proven in production.
+
+What it adds over the WPF server:
+
+- Admin UI in the browser: health, clients (mute, kick, ban), settings, channel names, bans, event log and API keys.
+  Times are shown in each viewer's own time zone; the **Desktop / Light / Dark** button in the top bar
+  switches the theme (Desktop follows the system setting) and is remembered per browser.
+- SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
+- Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
+- Event log of logins, admin actions, server start/stop and client connections, with automatic retention.
+- REST API with read and write API keys, described by an OpenAPI document and browsable in the
+  Scalar API reference at `/scalar`.
+- Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
+
+## Data directory
+
+Everything the server writes lives in one folder: `/data` in the container, otherwise the folder given
+with `--data-dir` or `SRS_DATA_DIR`. Without either, the application folder is used; on Windows, if that
+folder is not writable (for example under `C:\Program Files`), `C:\ProgramData\IL2-SRS-Server` is used
+instead. The first log line shows which folder is in use.
+
+| File | Purpose |
+| --- | --- |
+| `srs.db` | Settings, channel names, bans, event log, API keys (SQLite, WAL mode) |
+| `srs-server.json` | Optional configuration file with the same `SRS_*` keys as the environment |
+| `serverlog.txt` | Full server log (also written to the console) |
+| `keys/` | Keys that protect the admin login cookie |
+| `clients-list.json` | Client export, when **Auto Export List** is on |
+
+On first start, an existing `server.cfg` and `banned.txt` from the WPF server in the data directory are
+imported into `srs.db` (`-cfg=<file>` imports another file). The files are not changed or used afterwards.
+
+Use a local disk or a Docker named volume for the data directory. SQLite should not be placed on a
+network share (SMB/NFS).
+
+## Configuration
+
+Configuration keys can be set as environment variables, command-line arguments (`--KEY=value`) or in
+`srs-server.json` in the data directory.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `SRS_ADMIN_PASSWORD` | – | Admin UI password, at least 8 characters. Required. |
+| `SRS_ADMIN_PASSWORD_FILE` | – | Read the password from a file instead (Docker secrets). |
+| `SRS_ADMIN_AUTH_DISABLED` | `false` | Run the admin UI without a password. Only when access is restricted another way. |
+| `SRS_<SETTING>` | – | Fix a server setting, e.g. `SRS_SERVER_PORT=6002`, `SRS_COALITION_AUDIO_SECURITY=true`. Locked in the UI. |
+| `SRS_EVENT_RETENTION_DAYS` | `30` | Delete events older than this. |
+| `SRS_EVENT_MAX_ROWS` | `100000` | Keep at most this many events. |
+| `SRS_DATA_DIR` | app folder | Data directory (same as `--data-dir`). `/data` in the container. |
+| `urls` / `ASPNETCORE_URLS` | `http://localhost:8080` | Admin UI address. The container listens on port 8080 on all interfaces. |
+
+Server setting names are those of `server.cfg` (`SERVER_PORT`, `COALITION_AUDIO_SECURITY`,
+`SPECTATORS_AUDIO_DISABLED`, `IRL_RADIO_TX`, `RADIO_COLLISION_EFFECTS`, `SECOND_RADIO_ENABLED`,
+`CHANNEL_LIMIT`, `GLOBAL_LOBBY_FREQUENCIES`, `PRIORITY_TRANSMITTER_NAMES`, `SHOW_TUNED_COUNT`,
+`SHOW_TRANSMITTER_NAME`, `SHOW_SQUAD_CHANNEL_LABELS`, `CLIENT_EXPORT_ENABLED`, `CLIENT_EXPORT_FILE_PATH`,
+`ASSIGNED_CALLSIGNS_JSON_FILE`). Relative file paths are inside the data directory.
+
+## Docker
+
+The image is published as [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server)
+(tags `preview` and `<version>-preview`, amd64).
+
+```sh
+docker run -d --name il2-srs-server --restart unless-stopped \
+  -e SRS_ADMIN_PASSWORD='a-long-password' \
+  -p 6002:6002/tcp -p 6002:6002/udp -p 127.0.0.1:8080:8080 \
+  -v il2-srs-data:/data asken/il2-srs-server:preview
+```
+
+Or with the compose file in this folder (set `SRS_ADMIN_PASSWORD` in the shell or in a `.env` file next to it):
+
+```sh
+docker compose -f IL2-SRS-Server-Web/docker-compose.yml up -d
+```
+
+### Build from source
+
+```sh
+# From the repository root
+docker build -f IL2-SRS-Server-Web/Dockerfile -t il2-srs-server .
+```
+
+Then use `il2-srs-server` as the image name in the commands above.
+
+### Publishing the image
+
+`scripts/Publish-DockerImage.ps1` builds the image from the current commit (refusing uncommitted
+changes), pushes `<version>-preview` and `preview` to Docker Hub, and updates the Docker Hub short
+description and overview from [`DOCKERHUB.md`](DOCKERHUB.md). It uses your `docker login` for both.
+Editing the Hub page needs an access token with **Read, Write, Delete** access; if your `docker login`
+token has less, set `DOCKERHUB_TOKEN` to such a token (also the way to run it in CI).
+Use `-Suffix '' -Channel latest` for a release. The repository category can only be set on the Docker Hub website.
+
+### Notes
+
+- Publish the SRS port for **both TCP and UDP**. If you change it with `SRS_SERVER_PORT`, change the published ports too.
+- The admin UI is plain HTTP on port 8080. Keep it on localhost, or put a reverse proxy with HTTPS
+  (Caddy, Traefik, nginx) in front before exposing it.
+- To run several servers, run several containers with their own volume and ports.
+- The image has a health check: `docker ps` shows the container as `healthy` while both SRS listeners
+  are running, and `unhealthy` if one fails or an admin stops the server from the UI. The same check is
+  available as `GET /healthz` (`200 ok` or `503`) for other monitoring.
+- The container runs as a non-root user. If you bind-mount a host folder instead of a named volume,
+  it must be writable by UID 1654.
+
+## Windows
+
+Publish a self-contained build (no .NET installation needed on the server):
+
+```powershell
+dotnet publish IL2-SRS-Server-Web -c Release -r win-x64 --self-contained -o C:\IL2-SRS\app
+```
+
+Run it in a console (without `--data-dir`, see [Data directory](#data-directory)):
+
+```powershell
+$env:SRS_ADMIN_PASSWORD = 'a-long-password'
+C:\IL2-SRS\app\IL2-SRS-Server.exe --data-dir C:\IL2-SRS\main
+```
+
+Or install it as a Windows service from an elevated PowerShell prompt. The script writes
+`srs-server.json` (readable only by Administrators and SYSTEM), adds firewall rules for the SRS port
+and starts the service:
+
+```powershell
+C:\IL2-SRS\app\Install-WindowsService.ps1 -DataDirectory C:\IL2-SRS\main
+```
+
+Manage it with `Get-Service IL2-SRS-Server`, `Restart-Service IL2-SRS-Server`, or `sc.exe`. Remove it
+with `Stop-Service IL2-SRS-Server; sc.exe delete IL2-SRS-Server`. Without the script:
+
+```bat
+sc.exe create IL2-SRS-Server binPath= "\"C:\IL2-SRS\app\IL2-SRS-Server.exe\" --data-dir \"C:\IL2-SRS\main\"" start= auto
+```
+
+and put `SRS_ADMIN_PASSWORD` in `C:\IL2-SRS\main\srs-server.json`:
+
+```json
+{ "SRS_ADMIN_PASSWORD": "a-long-password", "urls": "http://localhost:8080" }
+```
+
+Limitations on Windows: UPnP port forwarding (`UPNP_ENABLED`) is not supported; forward the port on
+the router. The service writes its log to `serverlog.txt` in the data directory, not to the Windows
+event log.
+
+## API
+
+Create keys under **API Keys** in the admin UI and send them as `Authorization: Bearer <key>` (or
+`X-Api-Key: <key>`). Read keys can use every `GET`; write keys can use everything. Keys cannot create
+other keys.
+
+- **API reference:** `/scalar`, for logged-in admins and linked from the **API Keys** page. Paste a key
+  into its authentication field to try requests from the browser.
+- **OpenAPI document:** `/openapi/v1.json`, public, for code generators and scripts.
+
+| Method and path | Scope | Purpose |
+| --- | --- | --- |
+| `GET /api/v1/status` | read | Health, port, uptime, client counts |
+| `GET /api/v1/clients` | read | Connected clients |
+| `POST /api/v1/clients/{guid}/kick` | write | Disconnect a client |
+| `POST /api/v1/clients/{guid}/ban` | write | Ban and disconnect; body `{ "reason": "...", "durationMinutes": 60 }` |
+| `POST /api/v1/clients/{guid}/mute`, `/unmute` | write | Server-side mute |
+| `GET /api/v1/settings` | read | All settings, with source and lock state |
+| `PUT /api/v1/settings/{key}` | write | Change a setting; body `{ "value": "true" }` |
+| `GET`, `PUT /api/v1/channel-names` | read, write | Channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
+| `GET /api/v1/bans`, `POST /api/v1/bans`, `DELETE /api/v1/bans/{id}` | read, write | Bans; `POST` body `{ "ipAddress": "203.0.113.7", "reason": "...", "durationMinutes": null }` |
+| `GET /api/v1/events?category=&search=&since=&limit=` | read | Event log, newest first |
+| `DELETE /api/v1/events` | write | Clear the event log |
+| `POST /api/v1/server/start`, `/stop`, `/restart` | write | Server lifecycle |
+
+```sh
+curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
+```
+
+## Development
+
+Requires the .NET 10 SDK.
+
+```sh
+dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWORD=dev-password
+dotnet test --project IL2-SRS-Server-Web.Tests
+```
+
+The network code under `Network/` is adapted from the WPF server (`IL2-SimpleRadio Server`), and
+`IL2-SR-Common` is compiled in from source because it is still a .NET Framework library for the client.
+Fixes to the shared radio routing should be applied to both servers while both exist.

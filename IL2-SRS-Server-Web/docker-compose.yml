@@ -1,0 +1,30 @@
+# docker compose -f docker-compose.yml up -d
+#
+# Put the admin password in a .env file next to this file (SRS_ADMIN_PASSWORD=...),
+# or export it in the shell before running compose.
+# To run an image built from source instead, see "Build from source" in README.md.
+
+services:
+  il2-srs-server:
+    image: asken/il2-srs-server:preview
+    container_name: il2-srs-server
+    restart: unless-stopped
+    environment:
+      SRS_ADMIN_PASSWORD: ${SRS_ADMIN_PASSWORD:?Set SRS_ADMIN_PASSWORD (at least 8 characters)}
+      # Any server setting can be fixed here as SRS_<SETTING>; it is then locked in the admin UI.
+      # SRS_SERVER_PORT must match the published ports below.
+      SRS_SERVER_PORT: "6002"
+      # SRS_COALITION_AUDIO_SECURITY: "true"
+      # SRS_GLOBAL_LOBBY_FREQUENCIES: "248.22"
+      # SRS_EVENT_RETENTION_DAYS: "30"
+      # SRS_EVENT_MAX_ROWS: "100000"
+    ports:
+      - "6002:6002/tcp"
+      - "6002:6002/udp"
+      # Admin UI and API. Bound to localhost; put a reverse proxy with HTTPS in front to expose it.
+      - "127.0.0.1:8080:8080/tcp"
+    volumes:
+      - srs-data:/data
+
+volumes:
+  srs-data:

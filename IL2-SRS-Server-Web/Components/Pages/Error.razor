@@ -1,0 +1,25 @@
+@page "/error"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.Diagnostics
+
+<PageTitle>Error · IL2-SRS Server</PageTitle>
+
+<main class="login">
+    <div class="login-card">
+        <h1>Something went wrong</h1>
+        <p class="muted">The error has been written to the server log.</p>
+        @if (RequestId != null)
+        {
+            <p class="muted mono">Request ID: @RequestId</p>
+        }
+        <a class="btn btn-primary" href="/">Go to the dashboard</a>
+    </div>
+</main>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; }
+
+    private string RequestId => Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

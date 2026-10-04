@@ -1,0 +1,137 @@
+@page "/bans"
+@attribute [Authorize]
+@inject ServerAdminService Admin
+@inject AdminAuthOptions AuthOptions
+
+<PageTitle>Bans · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>Bans</h1>
+    <span class="muted">@_bans.Count(b => b.IsActive(DateTime.UtcNow)) active</span>
+</div>
+
+<section class="panel">
+    <h2>Ban an IP address</h2>
+    <form class="inline-form" @onsubmit="Add">
+        <label>
+            <span>IP address</span>
+            <input type="text" required placeholder="203.0.113.7" @bind="_ip" />
+        </label>
+        <label>
+            <span>Player (optional)</span>
+            <input type="text" maxlength="100" @bind="_player" />
+        </label>
+        <label class="grow">
+            <span>Reason (optional)</span>
+            <input type="text" maxlength="200" @bind="_reason" />
+        </label>
+        <label>
+            <span>Duration</span>
+            <select @bind="_minutes">
+                <option value="0">Permanent</option>
+                <option value="60">1 hour</option>
+                <option value="1440">1 day</option>
+                <option value="10080">7 days</option>
+                <option value="43200">30 days</option>
+            </select>
+        </label>
+        <button type="submit" class="btn btn-danger">Ban</button>
+    </form>
+    @if (_error != null)
+    {
+        <p class="alert alert-error" role="alert">@_error</p>
+    }
+    @if (_message != null)
+    {
+        <p class="alert" role="status">@_message</p>
+    }
+</section>
+
+@if (_bans.Count == 0)
+{
+    <p class="muted empty">No bans.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>IP address</th>
+                    <th>Player</th>
+                    <th>Reason</th>
+                    <th>Banned</th>
+                    <th>By</th>
+                    <th>Expires</th>
+                    <th class="actions-col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ban in _bans)
+                {
+                    var active = ban.IsActive(DateTime.UtcNow);
+                    <tr @key="ban.Id" class="@(active ? "" : "row-muted")">
+                        <td class="mono nowrap">@ban.IpAddress</td>
+                        <td>@(ban.PlayerName ?? "--")</td>
+                        <td>@(ban.Reason ?? "--")</td>
+                        <td><LocalTime Value="ban.CreatedAtUtc" /></td>
+                        <td>@ban.CreatedBy</td>
+                        <td class="date">
+                            @if (!ban.ExpiresAtUtc.HasValue)
+                            {
+                                <text>never</text>
+                            }
+                            else if (active)
+                            {
+                                <LocalTime Value="ban.ExpiresAtUtc.Value" />
+                            }
+                            else
+                            {
+                                <text>expired</text>
+                            }
+                        </td>
+                        <td class="actions-col">
+                            <ConfirmButton Text="Remove" Question="Remove ban?"
+                                           ConfirmText="Remove" OnConfirm="() => Remove(ban)" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<BanRecord> _bans = Array.Empty<BanRecord>();
+    private string _ip;
+    private string _player;
+    private string _reason;
+    private int _minutes;
+    private string _error;
+    private string _message;
+
+    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+
+    protected override void OnInitialized() => _bans = Admin.GetBans();
+
+    private void Add()
+    {
+        _error = Admin.BanAddress(_ip, _player, _reason, _minutes > 0 ? TimeSpan.FromMinutes(_minutes) : null, Actor,
+            out var ban);
+        _message = _error == null ? $"Banned {ban.IpAddress}." : null;
+        if (_error == null)
+        {
+            _ip = _player = _reason = null;
+            _minutes = 0;
+        }
+
+        _bans = Admin.GetBans();
+    }
+
+    private void Remove(BanRecord ban)
+    {
+        _error = null;
+        _message = Admin.Unban(ban.Id, Actor) ? $"Removed the ban on {ban.IpAddress}." : "That ban was already removed.";
+        _bans = Admin.GetBans();
+    }
+}

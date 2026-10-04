@@ -1,0 +1,41 @@
+@page "/login"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@inject AdminAuthOptions AuthOptions
+@inject NavigationManager Navigation
+
+<PageTitle>Log in · IL2-SRS Server</PageTitle>
+
+<main class="login">
+    <form method="post" action="account/login" class="login-card">
+        <AntiforgeryToken />
+        <div class="brand">
+            <img src="favicon.ico" alt="" width="28" height="28" />
+            <h1>IL2-SRS Server</h1>
+        </div>
+        @if (Error != null)
+        {
+            <p class="alert alert-error" role="alert">Incorrect password.</p>
+        }
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+        <label>
+            <span>Admin password</span>
+            <input type="password" name="password" autocomplete="current-password" required autofocus />
+        </label>
+        <button type="submit" class="btn btn-primary">Log in</button>
+    </form>
+</main>
+
+@code {
+    [SupplyParameterFromQuery] private string ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] private string Error { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (AuthOptions.Disabled)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+}

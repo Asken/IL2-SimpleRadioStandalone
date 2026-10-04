@@ -4,6 +4,7 @@
 
 ### Added
 
+- New web server: the IL2-SRS server can now run in Docker or as a Windows service and is managed from the browser. It includes a dashboard, client administration (mute, kick, ban with reason and duration), settings, channel names, a ban list, an event log of admin actions and client connections, and a REST API with read and write API keys. Settings can be fixed from environment variables. An existing `server.cfg` and `banned.txt` are imported on first start. The Windows server window remains available. See **Web server (Docker and Windows service)** in the server administrator guides.
 - Bind **Mute / Unmute Radio 1** and **Mute / Unmute Radio 2** in the Controls tab to mute or unmute a specific radio, whichever radio is currently selected.
 
 ### Changed

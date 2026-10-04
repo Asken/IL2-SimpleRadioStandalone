@@ -1,0 +1,32 @@
+@* A button that asks for confirmation inline instead of a browser dialog. *@
+@if (_confirming)
+{
+    <span class="confirm">
+        <span class="confirm-text">@Question</span>
+        <button type="button" class="btn @ConfirmClass" @onclick="Confirm">@ConfirmText</button>
+        <button type="button" class="btn btn-quiet" @onclick="() => _confirming = false">Cancel</button>
+    </span>
+}
+else
+{
+    <button type="button" class="btn @ButtonClass" disabled="@Disabled" title="@Title" @onclick="() => _confirming = true">@Text</button>
+}
+
+@code {
+    private bool _confirming;
+
+    [Parameter, EditorRequired] public string Text { get; set; }
+    [Parameter] public string Question { get; set; } = "Are you sure?";
+    [Parameter] public string ConfirmText { get; set; } = "Yes";
+    [Parameter] public string ButtonClass { get; set; } = "btn-quiet";
+    [Parameter] public string ConfirmClass { get; set; } = "btn-danger";
+    [Parameter] public string Title { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private async Task Confirm()
+    {
+        _confirming = false;
+        await OnConfirm.InvokeAsync();
+    }
+}

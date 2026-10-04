@@ -2,7 +2,9 @@
 using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
+#if !NETCOREAPP
 using System.Windows.Media;
+#endif
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Helpers;
 using Newtonsoft.Json;
 
@@ -55,6 +57,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Network
             }
         }
 
+#if !NETCOREAPP
         [JsonIgnore]
         public SolidColorBrush ClientCoalitionColour
         {
@@ -73,6 +76,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Network
                 }
             }
         }
+#endif
 
         [JsonIgnore]
         public bool Muted { get; set; }
