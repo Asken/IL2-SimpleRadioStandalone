@@ -15,7 +15,8 @@
 
 ### Compatibility
 
-- Existing SRS servers remain compatible; no server update is required for these client-side changes.
+- Existing clients and servers remain compatible. The client changes do not require a server update.
+- The new web server is optional. It accepts current clients on the same port and protocol and can replace the Windows server.
 
 ## IL2-SRS 1.0.4.12
 
