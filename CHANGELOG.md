@@ -9,6 +9,7 @@
 ### Fixed
 
 - The Pilot Roster fits its height to the pilots listed again after updating. In 1.0.5.0-beta.1, any roster height saved by an earlier version was treated as a size you had chosen, which turned automatic fitting off for most existing users. Only dragging the roster's edge now turns it off.
+- The intercom and radio audio channel balance sliders now move the sound steadily from left to right. Previously the inner half of each side worked backwards, so a slider set slightly left played mostly in the right ear and vice versa, and only the outer half moved the sound the expected way. Check your balance settings after updating: positions between the centre and halfway now sound on the side the slider points to.
 
 ## IL2-SRS 1.0.5.0-beta.1
 
