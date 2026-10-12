@@ -19,7 +19,8 @@ What it adds over the WPF server:
   radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
 - Integrations: run an action when an event happens, optionally only when the event data matches conditions
   (for example only Red pilots). Runs are queued, kept across restarts, retried if configured and listed under
-  **Integration Runs**.
+  **Integration Runs**. Built-in actions: **Post to Discord** (webhook, plain message or card) and **Send an HTTP
+  request** (any URL, e.g. Slack or Teams webhooks). See [Integrations](#integrations).
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
 - Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
@@ -191,6 +192,30 @@ other keys.
 ```sh
 curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
 ```
+
+## Integrations
+
+An integration runs an action when an event happens: pick the trigger event, optional conditions on the event
+data, and the action. **Test** runs it once with example data. Webhook URLs and headers are stored encrypted with the
+keys in `keys/` and never shown again; leave them empty when editing to keep the stored value.
+
+Messages and request bodies are [Scriban](https://github.com/scriban/scriban/blob/master/doc/language.md) templates
+over the event data shown on the integration page, with a live preview:
+
+```
+{{ client.name }} joined {{ client.coalitionName }}{{ if client.coalition == 1 }} 🔴{{ end }}
+```
+
+- **Post to Discord**: values from the event are Markdown-escaped, so a pilot called `**Admin**` shows as written,
+  and messages never mention anyone (`allowed_mentions` is empty). Use `{{ raw.client.name }}` for a value without
+  escaping. Each webhook sends at most 30 messages a minute; more wait their turn, as do messages Discord answers
+  with 429, without using up a retry.
+- **Send an HTTP request**: POST, PUT or PATCH to any URL with optional headers. An empty body sends the event data
+  as JSON. With a JSON content type, text values are escaped for use inside quotes
+  (`{"text": "{{ event.message }}"}`) and the body must be valid JSON. Any 2xx response is a success; 5xx and
+  timeouts are temporary failures (retried if the integration retries), other responses fail the run.
+
+Templates run sandboxed: no includes, loops and recursion are limited and a template stops after 2 seconds.
 
 ## Building on the server
 

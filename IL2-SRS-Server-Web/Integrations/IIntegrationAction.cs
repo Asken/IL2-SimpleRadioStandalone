@@ -74,4 +74,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         protected Task NotifyChanged() => ConfigChanged.InvokeAsync();
     }
+
+    public static class ActionConfigExtensions
+    {
+        /// <summary>A text setting, or null when it is missing or blank.</summary>
+        public static string GetText(this JsonObject config, string field)
+        {
+            return config != null && config.TryGetPropertyValue(field, out var node) && node is JsonValue value &&
+                   value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+                ? text
+                : null;
+        }
+    }
 }

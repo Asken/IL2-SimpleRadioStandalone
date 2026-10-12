@@ -247,6 +247,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 return;
             }
 
+            if (!result.CountsAsAttempt)
+            {
+                var wait = result.RetryAfter ?? TimeSpan.FromSeconds(10);
+                Logger.Info($"Integration \"{integration.Name}\" waits {wait.TotalSeconds:0} s: {result.Message}");
+                _store.Defer(execution.Id, result.Message, DateTime.UtcNow + wait);
+                return;
+            }
+
             var retry = result.Status == ExecutionStatus.Queued && integration.RetryMode != RetryMode.None &&
                         attempt <= integration.MaxRetries;
             if (retry)

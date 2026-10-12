@@ -254,6 +254,24 @@ WHERE id = $id;";
             RaiseExecutionsChanged();
         }
 
+        /// <summary>Queues a run again for later without counting the attempt it just made (rate limits).</summary>
+        public void Defer(long executionId, string reason, DateTime nextAttemptAtUtc)
+        {
+            using (var connection = _database.Open())
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"UPDATE integration_executions SET status = 'queued', attempts = MAX(attempts - 1, 0),
+    last_error = $reason, next_attempt_at = $next
+WHERE id = $id;";
+                command.Parameters.AddWithValue("$id", executionId);
+                command.Parameters.AddWithValue("$reason", (object)Truncate(reason) ?? DBNull.Value);
+                command.Parameters.AddWithValue("$next", SrsDatabase.FormatTimestamp(nextAttemptAtUtc));
+                command.ExecuteNonQuery();
+            }
+
+            RaiseExecutionsChanged();
+        }
+
         /// <summary>Queues a finished run again, to run now.</summary>
         public bool Requeue(long executionId)
         {

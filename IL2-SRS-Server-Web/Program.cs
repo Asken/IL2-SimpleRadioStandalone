@@ -142,6 +142,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             builder.Services.AddSingleton<IntegrationService>();
             builder.Services.AddSingleton<IntegrationDispatcher>();
             builder.Services.AddHostedService(services => services.GetRequiredService<IntegrationDispatcher>());
+            builder.Services.AddSingleton<WebhookRateLimiter>();
+            builder.Services.AddHttpClient(WebhookHttp.ClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(20);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("IL2-SRS-Server/" + Common.Network.ReleaseMetadata.Version);
+            });
+            builder.Services.AddIntegrationAction<DiscordWebhookAction>();
+            builder.Services.AddIntegrationAction<HttpWebhookAction>();
 
             // Keep login cookies valid across restarts.
             builder.Services.AddDataProtection()

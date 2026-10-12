@@ -122,11 +122,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     /// <summary>What an action reports after running.</summary>
     public sealed class IntegrationResult
     {
-        private IntegrationResult(string status, string message, TimeSpan? retryAfter)
+        private IntegrationResult(string status, string message, TimeSpan? retryAfter, bool countsAsAttempt = true)
         {
             Status = status;
             Message = message;
             RetryAfter = retryAfter;
+            CountsAsAttempt = countsAsAttempt;
         }
 
         public string Status { get; }
@@ -134,12 +135,22 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public TimeSpan? RetryAfter { get; }
         public bool IsSuccess => Status == ExecutionStatus.Succeeded;
 
+        /// <summary>False for <see cref="Defer"/>: the run waits without using up a retry.</summary>
+        public bool CountsAsAttempt { get; }
+
         public static IntegrationResult Success(string message = null) =>
             new(ExecutionStatus.Succeeded, message, null);
 
         /// <summary>A temporary failure: retried if the integration allows it (after <paramref name="after"/> if given).</summary>
         public static IntegrationResult Retry(string error, TimeSpan? after = null) =>
             new(ExecutionStatus.Queued, error, after);
+
+        /// <summary>
+        /// Not run yet because of a rate limit: run again after <paramref name="after"/>, even when the integration
+        /// does not retry, without counting an attempt.
+        /// </summary>
+        public static IntegrationResult Defer(string reason, TimeSpan after) =>
+            new(ExecutionStatus.Queued, reason, after, countsAsAttempt: false);
 
         /// <summary>A failure that retrying will not fix, such as a rejected webhook URL.</summary>
         public static IntegrationResult Fail(string error) => new(ExecutionStatus.Failed, error, null);

@@ -317,6 +317,28 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public async Task RateLimitedRunsWaitWithoutUsingUpARetry()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            Save(service, "No retries");
+            action.Results.Enqueue(IntegrationResult.Defer("Slow down", TimeSpan.FromSeconds(20)));
+            dispatcher.Match(Connected());
+
+            var deferred = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Queued, deferred.Status);
+            Assert.Equal(0, deferred.Attempts);
+            Assert.Equal("Slow down", deferred.LastError);
+            Assert.InRange(deferred.NextAttemptAtUtc!.Value - DateTime.UtcNow, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(21));
+
+            var succeeded = await RunNext(service, dispatcher, force: true);
+            Assert.Equal(ExecutionStatus.Succeeded, succeeded.Status);
+            Assert.Equal(1, succeeded.Attempts);
+        }
+
+        [Fact]
         public async Task RecordsSuccessAndPermanentFailureAndSkipsDisabledIntegrations()
         {
             using var temp = new TempDirectory();

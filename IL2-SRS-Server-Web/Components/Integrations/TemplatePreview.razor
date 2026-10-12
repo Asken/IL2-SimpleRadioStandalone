@@ -1,0 +1,49 @@
+@* Shows what a template produces for the trigger event's example data. *@
+@using System.Text.Json
+
+<div class="template-preview">
+    <span class="field-label">@Label</span>
+    @if (Trigger == null)
+    {
+        <span class="field-help">Choose a trigger event to see a preview.</span>
+    }
+    else if (_error != null)
+    {
+        <p class="alert alert-error small" role="alert">@_error</p>
+    }
+    else
+    {
+        <pre class="preview-output">@_output</pre>
+        <span class="field-help">With example data for the @Trigger.Label.ToLowerInvariant() event.</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Preview";
+    [Parameter] public SrsEventType Trigger { get; set; }
+
+    /// <summary>Builds the preview from example data; throws <see cref="TemplateException"/> for errors.</summary>
+    [Parameter, EditorRequired] public Func<JsonElement, string> Render { get; set; }
+
+    private string _output;
+    private string _error;
+
+    protected override void OnParametersSet()
+    {
+        _output = null;
+        _error = null;
+        if (Trigger == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _output = Render(EventData.Sample(Trigger));
+        }
+        catch (TemplateException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}
