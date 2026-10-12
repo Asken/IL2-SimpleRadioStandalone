@@ -241,6 +241,16 @@ dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWOR
 dotnet test --project IL2-SRS-Server-Web.Tests
 ```
 
+[`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload
+(`dotnet watch`): edits to `.razor`, `.cs` and `.css` files apply to the running server, which restarts itself
+when an edit can't be applied in place. It uses the same data volume and ports as the image (`il2-srs-data`,
+6002 and `127.0.0.1:8081`), so stop that container first, and reads `SRS_ADMIN_PASSWORD` from
+`IL2-SRS-Server-Web/.env` (git-ignored).
+
+```sh
+docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml up -d --build
+```
+
 The network code under `Network/` is adapted from the WPF server (`IL2-SimpleRadio Server`), and
 `IL2-SR-Common` is compiled in from source because it is still a .NET Framework library for the client.
 Fixes to the shared radio routing should be applied to both servers while both exist.
