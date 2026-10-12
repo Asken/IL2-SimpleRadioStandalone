@@ -164,9 +164,25 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var events = Authorized(HttpMethod.Get, "/api/v1/events?category=admin", writeKey);
             using var eventResponse = await _http.SendAsync(events, token);
             var eventList = await eventResponse.Content.ReadFromJsonAsync<JsonElement>(token);
-            Assert.Contains(eventList.EnumerateArray(), e =>
+            var banned = Assert.Single(eventList.EnumerateArray(), e =>
                 e.GetProperty("actor").GetString() == "api:writer" &&
                 e.GetProperty("message").GetString().StartsWith("Banned Test Pilot (Red)", StringComparison.Ordinal));
+            Assert.Equal("admin.client_banned", banned.GetProperty("type").GetString());
+            var payload = banned.GetProperty("payload");
+            Assert.Equal("Test Pilot", payload.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("Red", payload.GetProperty("client").GetProperty("coalitionName").GetString());
+            Assert.Equal("127.0.0.1", payload.GetProperty("ban").GetProperty("ip").GetString());
+
+            using var connected = Authorized(HttpMethod.Get, "/api/v1/events?type=client.connected", writeKey);
+            using var connectedResponse = await _http.SendAsync(connected, token);
+            var connectedList = await connectedResponse.Content.ReadFromJsonAsync<JsonElement>(token);
+            Assert.Contains(connectedList.EnumerateArray(), e =>
+                e.GetProperty("payload").GetProperty("client").GetProperty("ip").GetString() == "127.0.0.1");
+
+            using var types = Authorized(HttpMethod.Get, "/api/v1/event-types", writeKey);
+            using var typesResponse = await _http.SendAsync(types, token);
+            var typeList = await typesResponse.Content.ReadFromJsonAsync<JsonElement>(token);
+            Assert.Contains(typeList.EnumerateArray(), t => t.GetProperty("type").GetString() == "radio.frequency_changed");
         }
 
         private static HttpRequestMessage Authorized(HttpMethod method, string path, string key)

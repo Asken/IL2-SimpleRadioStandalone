@@ -7,6 +7,7 @@ using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Components;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
@@ -122,7 +123,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             builder.Services.AddSingleton(adminAuth);
             builder.Services.AddSingleton<ServerEvents>();
             builder.Services.AddSingleton<ServerState>();
-            builder.Services.AddSingleton<ServerEventAuditor>();
+            builder.Services.AddSingleton<ClientEventRecorder>();
             builder.Services.AddSingleton<ServerAdminService>();
             // Registered first so it stops last and stores the shutdown events.
             builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());

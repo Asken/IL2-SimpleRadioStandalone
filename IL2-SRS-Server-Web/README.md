@@ -15,7 +15,8 @@ What it adds over the WPF server:
   equipment panels) and is remembered per browser.
 - SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
-- Event log of logins, admin actions, server start/stop and client connections, with automatic retention.
+- Live event log of logins, admin actions, server start/stop, client connections, name and coalition changes and
+  radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
 - Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
@@ -172,7 +173,8 @@ other keys.
 | `PUT /api/v1/settings/{key}` | write | Change a setting; body `{ "value": "true" }` |
 | `GET`, `PUT /api/v1/channel-names` | read, write | Channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
 | `GET /api/v1/bans`, `POST /api/v1/bans`, `DELETE /api/v1/bans/{id}` | read, write | Bans; `POST` body `{ "ipAddress": "203.0.113.7", "reason": "...", "durationMinutes": null }` |
-| `GET /api/v1/events?category=&search=&since=&limit=` | read | Event log, newest first |
+| `GET /api/v1/events?category=&type=&client=&search=&since=&limit=` | read | Event log, newest first, with each event's type and payload |
+| `GET /api/v1/event-types` | read | Event types and their payload fields |
 | `DELETE /api/v1/events` | write | Clear the event log |
 | `POST /api/v1/server/start`, `/stop`, `/restart` | write | Server lifecycle |
 

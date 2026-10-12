@@ -1,13 +1,17 @@
 @page "/events"
 @attribute [Authorize]
-@inject ServerAdminService Admin
-@inject AdminAuthOptions AuthOptions
+@inherits LiveComponent
+@using System.Text.Json
 
 <PageTitle>Event Log · IL2-SRS Server</PageTitle>
 
 <div class="page-head">
     <h1>Event Log</h1>
     <div class="actions">
+        <label class="live-toggle">
+            <input type="checkbox" @bind="Live" @bind:after="Load" />
+            <span>Live</span>
+        </label>
         <button type="button" class="btn btn-quiet" @onclick="Load">Refresh</button>
         <ConfirmButton Text="Clear Log" Question="Delete all stored events?" ConfirmText="Clear" OnConfirm="Clear" />
     </div>
@@ -25,11 +29,21 @@
     </label>
     <label>
         <span>Category</span>
-        <select @bind="Category" @bind:after="Load">
+        <select @bind="Category" @bind:after="CategoryChanged">
             <option value="">All</option>
-            @foreach (var category in AuditCategory.All)
+            @foreach (var category in EventCategory.All)
             {
                 <option value="@category">@category</option>
+            }
+        </select>
+    </label>
+    <label>
+        <span>Type</span>
+        <select @bind="Type" @bind:after="Load">
+            <option value="">All</option>
+            @foreach (var eventType in SrsEventTypes.All.Where(t => string.IsNullOrEmpty(Category) || t.Category == Category))
+            {
+                <option value="@eventType.Type">@eventType.Label</option>
             }
         </select>
     </label>
@@ -41,6 +55,12 @@
             <option value="1000">1000</option>
         </select>
     </label>
+    @if (_clientGuid != null)
+    {
+        <button type="button" class="btn btn-quiet filter-chip" title="Show all clients" @onclick="() => FilterClient(null, null)">
+            Client: @_clientName <Icon Name="x" />
+        </button>
+    }
 </div>
 
 @if (_events.Count == 0)
@@ -50,11 +70,12 @@
 else
 {
     <div class="table-wrap">
-        <table class="grid">
+        <table class="grid events">
             <thead>
                 <tr>
                     <th>Time</th>
                     <th>Category</th>
+                    <th>Type</th>
                     <th>Actor</th>
                     <th>Event</th>
                 </tr>
@@ -62,12 +83,32 @@ else
             <tbody>
                 @foreach (var auditEvent in _events)
                 {
-                    <tr @key="auditEvent.Id">
+                    var expanded = _expanded.Contains(auditEvent.Id);
+                    <tr @key="auditEvent.Id" class="@(auditEvent.Payload != null ? "expandable" : null)"
+                        aria-expanded="@(auditEvent.Payload != null ? expanded.ToString().ToLowerInvariant() : null)"
+                        @onclick="() => Toggle(auditEvent)">
                         <td><LocalTime Value="auditEvent.OccurredAtUtc" Format="seconds" /></td>
                         <td><span class="tag tag-@auditEvent.Category">@auditEvent.Category</span></td>
+                        <td class="nowrap"><code>@(auditEvent.Type ?? "—")</code></td>
                         <td class="nowrap">@auditEvent.Actor</td>
-                        <td>@auditEvent.Message</td>
+                        <td>
+                            @auditEvent.Message
+                            @if (auditEvent.ClientGuid != null && auditEvent.ClientGuid != _clientGuid)
+                            {
+                                <button type="button" class="btn btn-quiet btn-small" title="Show only this client"
+                                        @onclick="() => FilterClient(auditEvent.ClientGuid, ClientName(auditEvent))"
+                                        @onclick:stopPropagation="true">
+                                    <Icon Name="funnel" />
+                                </button>
+                            }
+                        </td>
                     </tr>
+                    @if (expanded)
+                    {
+                        <tr class="payload-row">
+                            <td colspan="5"><pre class="payload">@FormatPayload(auditEvent.Payload)</pre></td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>
@@ -75,28 +116,117 @@ else
 }
 
 @code {
+    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
     private IReadOnlyList<AuditEvent> _events = Array.Empty<AuditEvent>();
+    private readonly HashSet<long> _expanded = new();
     private long _total;
+    private string _clientGuid;
+    private string _clientName;
 
     private string Search { get; set; }
     private string Category { get; set; } = string.Empty;
+    private string Type { get; set; } = string.Empty;
     private int Limit { get; set; } = 100;
+    private bool Live { get; set; } = true;
 
-    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+    protected override bool RefreshEverySecond => false;
 
-    protected override void OnInitialized() => Load();
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Admin.Audit.Stored += OnStored;
+        Load();
+    }
+
+    protected override void OnLiveRefresh()
+    {
+        if (Live)
+        {
+            Load();
+        }
+    }
+
+    private void OnStored()
+    {
+        if (Live)
+        {
+            QueueRefresh();
+        }
+    }
 
     private void Load()
     {
-        _events = Admin.Audit.Query(Category, Search, null, Limit);
+        _events = Admin.Audit.Query(Category, Search, null, Limit, Type, _clientGuid);
         _total = Admin.Audit.Count();
+    }
+
+    private void CategoryChanged()
+    {
+        if (!string.IsNullOrEmpty(Type) && SrsEventTypes.Find(Type)?.Category != Category && !string.IsNullOrEmpty(Category))
+        {
+            Type = string.Empty;
+        }
+
+        Load();
+    }
+
+    private void FilterClient(string clientGuid, string clientName)
+    {
+        _clientGuid = clientGuid;
+        _clientName = clientName ?? clientGuid;
+        Load();
+    }
+
+    private void Toggle(AuditEvent auditEvent)
+    {
+        if (auditEvent.Payload != null && !_expanded.Remove(auditEvent.Id))
+        {
+            _expanded.Add(auditEvent.Id);
+        }
+    }
+
+    private static string ClientName(AuditEvent auditEvent)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(auditEvent.Payload);
+            return document.RootElement.TryGetProperty("client", out var client) &&
+                   client.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
+                ? name.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string FormatPayload(string payload)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            return JsonSerializer.Serialize(document.RootElement, Indented);
+        }
+        catch (JsonException)
+        {
+            return payload;
+        }
     }
 
     private async Task Clear()
     {
         Admin.Audit.Clear(Actor);
+        _expanded.Clear();
         // Give the background writer a moment to store the "cleared" event.
         await Task.Delay(300);
         Load();
+    }
+
+    public override void Dispose()
+    {
+        Admin.Audit.Stored -= OnStored;
+        base.Dispose();
     }
 }

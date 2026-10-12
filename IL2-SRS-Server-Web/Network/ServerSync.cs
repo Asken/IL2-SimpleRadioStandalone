@@ -269,6 +269,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
                 if (client != null)
                 {
                     bool redrawClientAdminList = client.Name != message.Client.Name || client.Coalition != message.Client.Coalition;
+                    var previousName = client.Name;
+                    var previousCoalition = client.Coalition;
 
                     //copy the data we need
                     client.LastUpdate = DateTime.Now.Ticks;
@@ -304,6 +306,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
                     // Only redraw client admin UI of server if really needed
                     if (redrawClientAdminList)
                     {
+                        _events.PublishClientUpdated(client, previousName, previousCoalition, null);
                         _events.PublishClientsChanged();
                     }
                 }
@@ -347,6 +350,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
                     var assignedAirfield = _callsignProvider.GetAssignedAirfield(message.Client.Name, message.Client.Coalition);
 
                     var changed = false;
+                    var previousName = client.Name;
+                    var previousCoalition = client.Coalition;
+                    var previousGameState = client.GameState;
 
                     if (client.GameState == null)
                     {
@@ -374,6 +380,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
                     client.AssignedAirfield = assignedAirfield;
 
                     Logger.Debug($"Client radio update: {message.Client.ClientGuid} ({message.Client.Name}) Coalition {message.Client.Coalition}, Callsign {client.AssignedCallsign}, Radios {PrettyPrint(message.Client.GameState.radios)}");
+
+                    if (changed)
+                    {
+                        _events.PublishClientUpdated(client, previousName, previousCoalition, previousGameState);
+                    }
 
                     TimeSpan lastSent = new TimeSpan(DateTime.Now.Ticks - client.LastRadioUpdateSent);
 

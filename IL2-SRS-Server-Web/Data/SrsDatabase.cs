@@ -12,7 +12,58 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
     {
         public const string FileName = "srs.db";
 
-        private const int SchemaVersion = 1;
+        /// <summary>Schema changes, in order; migration N takes the database from version N to N + 1.</summary>
+        private static readonly string[] Migrations =
+        {
+            // 1: initial schema.
+            @"
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS channel_names (
+    channel INTEGER PRIMARY KEY,
+    name    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS bans (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip          TEXT NOT NULL,
+    player_name TEXT,
+    reason      TEXT,
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_bans_ip ON bans (ip);
+CREATE TABLE IF NOT EXISTS events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    message     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_events_occurred_at ON events (occurred_at);
+CREATE TABLE IF NOT EXISTS api_keys (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    scope        TEXT NOT NULL,
+    prefix       TEXT NOT NULL UNIQUE,
+    key_hash     BLOB NOT NULL UNIQUE,
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT,
+    revoked_at   TEXT
+);",
+            // 2: typed events (type, client and JSON payload; null for older rows).
+            @"
+ALTER TABLE events ADD COLUMN type TEXT;
+ALTER TABLE events ADD COLUMN client_guid TEXT;
+ALTER TABLE events ADD COLUMN payload TEXT;
+CREATE INDEX IF NOT EXISTS ix_events_type ON events (type);
+CREATE INDEX IF NOT EXISTS ix_events_client_guid ON events (client_guid);"
+        };
+
+        public static int SchemaVersion => Migrations.Length;
 
         private readonly string _connectionString;
 
@@ -76,48 +127,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
             }
 
             using var transaction = connection.BeginTransaction();
-            using (var command = connection.CreateCommand())
+            for (var step = version; step < SchemaVersion; step++)
             {
+                using var command = connection.CreateCommand();
                 command.Transaction = transaction;
-                command.CommandText = @"
-CREATE TABLE IF NOT EXISTS settings (
-    key        TEXT PRIMARY KEY,
-    value      TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS channel_names (
-    channel INTEGER PRIMARY KEY,
-    name    TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS bans (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ip          TEXT NOT NULL,
-    player_name TEXT,
-    reason      TEXT,
-    created_by  TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    expires_at  TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_bans_ip ON bans (ip);
-CREATE TABLE IF NOT EXISTS events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    occurred_at TEXT NOT NULL,
-    category    TEXT NOT NULL,
-    actor       TEXT NOT NULL,
-    message     TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_events_occurred_at ON events (occurred_at);
-CREATE TABLE IF NOT EXISTS api_keys (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    name         TEXT NOT NULL,
-    scope        TEXT NOT NULL,
-    prefix       TEXT NOT NULL UNIQUE,
-    key_hash     BLOB NOT NULL UNIQUE,
-    created_at   TEXT NOT NULL,
-    last_used_at TEXT,
-    revoked_at   TEXT
-);
-PRAGMA user_version = " + SchemaVersion.ToString(CultureInfo.InvariantCulture) + ";";
+                command.CommandText = Migrations[step] + "\nPRAGMA user_version = " +
+                                      (step + 1).ToString(CultureInfo.InvariantCulture) + ";";
                 command.ExecuteNonQuery();
             }
 
