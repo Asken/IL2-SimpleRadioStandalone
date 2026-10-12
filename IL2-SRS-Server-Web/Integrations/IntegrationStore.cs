@@ -92,7 +92,8 @@ SELECT $id;";
                 command.Parameters.AddWithValue("$description",
                     string.IsNullOrWhiteSpace(integration.Description) ? DBNull.Value : integration.Description.Trim());
                 command.Parameters.AddWithValue("$enabled", integration.Enabled ? 1 : 0);
-                command.Parameters.AddWithValue("$trigger", integration.TriggerType);
+                // Comma-separated; a single type (as stored by older builds) is a list of one.
+                command.Parameters.AddWithValue("$trigger", string.Join(",", integration.TriggerTypes));
                 command.Parameters.AddWithValue("$conditions", JsonSerializer.Serialize(
                     integration.Conditions.Where(c => !string.IsNullOrWhiteSpace(c.Field)), JsonOptions));
                 command.Parameters.AddWithValue("$action", integration.ActionType);
@@ -444,7 +445,8 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                     Name = reader.GetString(1),
                     Description = reader.IsDBNull(2) ? null : reader.GetString(2),
                     Enabled = reader.GetInt64(3) != 0,
-                    TriggerType = reader.GetString(4),
+                    TriggerTypes = reader.GetString(4)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                     Conditions = ParseConditions(reader.GetString(5)),
                     ActionType = reader.GetString(6),
                     ActionConfig = config,

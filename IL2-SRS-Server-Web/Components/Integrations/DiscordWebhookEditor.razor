@@ -73,7 +73,7 @@
     <TemplateHelp Escaping="Values from the event are escaped, so player names cannot add formatting or links, and the message never mentions anyone." />
 </div>
 
-<TemplatePreview Trigger="Trigger" Render="Preview" />
+<TemplatePreview Triggers="Triggers" Render="Preview" />
 
 @code {
     private string Style => GetString(DiscordWebhookAction.StyleField) ?? DiscordWebhookAction.StyleText;

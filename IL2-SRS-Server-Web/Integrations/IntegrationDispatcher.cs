@@ -79,7 +79,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             JsonElement? data = null;
             foreach (var integration in integrations)
             {
-                if (integration.TriggerType != srsEvent.Type)
+                if (!integration.IsTriggeredBy(srsEvent.Type))
                 {
                     continue;
                 }

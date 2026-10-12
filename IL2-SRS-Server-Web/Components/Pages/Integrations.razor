@@ -69,7 +69,7 @@ else
                             }
                         </td>
                         <td>
-                            @(integration.Trigger?.Label ?? integration.TriggerType)
+                            @string.Join(", ", integration.TriggerTypes.Select(t => SrsEventTypes.Find(t)?.Label ?? t))
                             @if (integration.Conditions.Count > 0)
                             {
                                 <div class="muted small">

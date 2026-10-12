@@ -51,33 +51,62 @@
     </div>
 
     <div class="field">
-        <label for="trigger">Trigger event</label>
-        <select id="trigger" aria-invalid="@Invalid(IntegrationValidation.Trigger)"
-                aria-describedby="@DescribedBy(IntegrationValidation.Trigger)"
-                @bind="_triggerType" @bind:after="TriggerChanged" @onblur="() => _form.Touch(IntegrationValidation.Trigger)">
-            <option value="">Choose an event</option>
+        <label for="add-trigger">Trigger events</label>
+        <span class="field-help">
+            Runs when any of these events happens. In a template, <code>@("{{ event.type }}")</code> tells them apart.
+        </span>
+        @foreach (var trigger in Triggers)
+        {
+            <div class="trigger-row" @key="trigger.Type">
+                <div class="trigger-text">
+                    <span><strong>@trigger.Label</strong> <code>@trigger.Type</code></span>
+                    <span class="field-help">@trigger.Description</span>
+                </div>
+                <button type="button" class="btn btn-quiet" title="Remove @trigger.Label"
+                        aria-label="Remove @trigger.Label" @onclick="() => RemoveTrigger(trigger.Type)">
+                    <Icon Name="x" />
+                </button>
+            </div>
+        }
+        <select id="add-trigger" value="" aria-invalid="@Invalid(IntegrationValidation.Triggers)"
+                aria-describedby="@DescribedBy(IntegrationValidation.Triggers)"
+                @onchange="e => AddTrigger(e.Value?.ToString())" @onblur="() => _form.Touch(IntegrationValidation.Triggers)">
+            <option value="">@(_triggerTypes.Count == 0 ? "Choose an event" : "Add another event")</option>
             @foreach (var category in EventCategory.All)
             {
                 <optgroup label="@category">
-                    @foreach (var eventType in SrsEventTypes.All.Where(t => t.Category == category))
+                    @foreach (var eventType in SrsEventTypes.All.Where(t => t.Category == category && !_triggerTypes.Contains(t.Type)))
                     {
                         <option value="@eventType.Type">@eventType.Label (@eventType.Type)</option>
                     }
                 </optgroup>
             }
         </select>
-        <FieldError Id="@ErrorId(IntegrationValidation.Trigger)" Message="@Show(IntegrationValidation.Trigger)" />
-        @if (Trigger != null)
+        <FieldError Id="@ErrorId(IntegrationValidation.Triggers)" Message="@Show(IntegrationValidation.Triggers)" />
+        @if (Triggers.Count > 0)
         {
-            <span class="field-help">@Trigger.Description</span>
             <details class="schema">
-                <summary>Data available for <code>@Trigger.Type</code></summary>
+                <summary>Data available to conditions and templates</summary>
                 <table class="grid compact">
-                    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>Field</th><th>Type</th><th>Description</th>
+                            @if (Triggers.Count > 1)
+                            {
+                                <th>Events</th>
+                            }
+                        </tr>
+                    </thead>
                     <tbody>
-                        @foreach (var field in EventData.Fields(Trigger))
+                        @foreach (var use in EventData.Fields(Triggers))
                         {
-                            <tr><td><code>@field.Path</code></td><td>@field.Type</td><td>@field.Description</td></tr>
+                            <tr>
+                                <td><code>@use.Field.Path</code></td><td>@use.Field.Type</td><td>@use.Field.Description</td>
+                                @if (Triggers.Count > 1)
+                                {
+                                    <td>@(use.OnlyIn.Count == 0 ? "All" : string.Join(", ", use.OnlyIn.Select(t => t.Label)))</td>
+                                }
+                            </tr>
                         }
                     </tbody>
                 </table>
@@ -95,11 +124,11 @@
             var valueKey = IntegrationValidation.Condition(index, "value");
             <div class="condition" @key="condition">
             <div class="condition-row">
-                <select aria-label="Field" @bind="condition.Field" disabled="@(Trigger == null)">
+                <select aria-label="Field" @bind="condition.Field" disabled="@(Triggers.Count == 0)">
                     <option value="">Field</option>
-                    @foreach (var field in EventData.Fields(Trigger))
+                    @foreach (var use in EventData.Fields(Triggers))
                     {
-                        <option value="@field.Path">@field.Path</option>
+                        <option value="@use.Field.Path">@use.Field.Path@(use.OnlyIn.Count == 0 ? "" : " (" + string.Join(", ", use.OnlyIn.Select(t => t.Label)) + " only)")</option>
                     }
                 </select>
                 <select aria-label="Comparison" @bind="condition.Operator">
@@ -186,17 +215,20 @@
     }
     @if (_test != null)
     {
-        <div class="alert @(_test.Result.IsSuccess ? "alert-ok" : "alert-error")" role="status">
-            <strong>@(_test.Result.IsSuccess ? "Test succeeded" : "Test failed")</strong>
-            @if (!string.IsNullOrEmpty(_test.Result.Message))
-            {
-                <text>: @_test.Result.Message</text>
-            }
-            @if (!_test.ConditionsMatchSample)
-            {
-                <div class="small">The example event does not match the conditions; real events like it would be skipped.</div>
-            }
-        </div>
+        @foreach (var run in _test.Runs)
+        {
+            <div class="alert @(run.Result.IsSuccess ? "alert-ok" : "alert-error")" role="status">
+                <strong>@(run.Result.IsSuccess ? "Test succeeded" : "Test failed")@(_test.Runs.Count > 1 && run.Event != null ? " · " + run.Event.Label : "")</strong>
+                @if (!string.IsNullOrEmpty(run.Result.Message))
+                {
+                    <text>: @run.Result.Message</text>
+                }
+                @if (run.Event != null && !run.ConditionsMatchSample)
+                {
+                    <div class="small">The example event does not match the conditions; real events like it would be skipped.</div>
+                }
+            </div>
+        }
     }
 
     <div class="form-actions">
@@ -221,7 +253,7 @@
     private string _name;
     private string _description;
     private bool _enabled = true;
-    private string _triggerType = string.Empty;
+    private readonly List<string> _triggerTypes = new();
     private readonly List<ConditionRow> _conditions = new();
     private string _actionType = string.Empty;
     private JsonObject _config = new();
@@ -237,7 +269,8 @@
     private IntegrationValidation _validation;
     private bool _focusFirstError;
 
-    private SrsEventType Trigger => SrsEventTypes.Find(_triggerType);
+    private IReadOnlyList<SrsEventType> Triggers =>
+        _triggerTypes.Select(SrsEventTypes.Find).Where(t => t != null).ToList();
     private IIntegrationAction Action => Integrations.FindAction(_actionType);
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
@@ -245,7 +278,7 @@
     {
         [nameof(IntegrationActionEditor.Config)] = _config,
         [nameof(IntegrationActionEditor.SecretHints)] = _hints,
-        [nameof(IntegrationActionEditor.Trigger)] = Trigger,
+        [nameof(IntegrationActionEditor.Triggers)] = Triggers,
         [nameof(IntegrationActionEditor.ConfigChanged)] = EventCallback.Factory.Create(this, () => _test = null),
         [nameof(IntegrationActionEditor.Errors)] = ConfigErrors(),
         [nameof(IntegrationActionEditor.FieldTouched)] = EventCallback.Factory.Create<string>(this,
@@ -315,7 +348,8 @@
         _name = _stored.Name;
         _description = _stored.Description;
         _enabled = _stored.Enabled;
-        _triggerType = _stored.TriggerType;
+        _triggerTypes.Clear();
+        _triggerTypes.AddRange(_stored.TriggerTypes);
         _conditions.Clear();
         _conditions.AddRange(_stored.Conditions.Select(c => new ConditionRow
         {
@@ -328,9 +362,27 @@
         _maxRetries = _stored.RetryMode == RetryMode.None ? 3 : _stored.MaxRetries;
     }
 
-    private void TriggerChanged()
+    private void AddTrigger(string type)
     {
-        var fields = EventData.Fields(Trigger).Select(f => f.Path).ToHashSet();
+        if (!string.IsNullOrEmpty(type) && !_triggerTypes.Contains(type))
+        {
+            _triggerTypes.Add(type);
+            _form.Touch(IntegrationValidation.Triggers);
+            TriggersChanged();
+        }
+    }
+
+    private void RemoveTrigger(string type)
+    {
+        _triggerTypes.Remove(type);
+        _form.Touch(IntegrationValidation.Triggers);
+        TriggersChanged();
+    }
+
+    /// <summary>Clears condition fields that none of the trigger events have any more.</summary>
+    private void TriggersChanged()
+    {
+        var fields = EventData.Fields(Triggers).Select(f => f.Field.Path).ToHashSet();
         foreach (var condition in _conditions.Where(c => !fields.Contains(c.Field)))
         {
             condition.Field = string.Empty;
@@ -361,7 +413,7 @@
         Name = _name?.Trim(),
         Description = _description,
         Enabled = _enabled,
-        TriggerType = _triggerType,
+        TriggerTypes = _triggerTypes.ToList(),
         // Every row, so errors line up with the rows; rows without a field are dropped when saving.
         Conditions = _conditions
             .Select(c => new IntegrationCondition(c.Field, c.Operator,

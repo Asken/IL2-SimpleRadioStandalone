@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
@@ -43,7 +44,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     /// <summary>A filter on one field of the event data, e.g. <c>client.coalitionName is Red</c>.</summary>
     public sealed record IntegrationCondition(string Field, string Operator, string Value);
 
-    /// <summary>A rule: when an event of <see cref="TriggerType"/> matches the conditions, run the action.</summary>
+    /// <summary>A rule: when an event of one of the <see cref="TriggerTypes"/> matches the conditions, run the action.</summary>
     public sealed class IntegrationDefinition
     {
         public const int MaxRetriesLimit = 10;
@@ -53,7 +54,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public string Name { get; init; }
         public string Description { get; init; }
         public bool Enabled { get; init; } = true;
-        public string TriggerType { get; init; }
+        /// <summary>The event types that run this integration, e.g. server.started and server.stopped.</summary>
+        public IReadOnlyList<string> TriggerTypes { get; init; } = Array.Empty<string>();
+
         public IReadOnlyList<IntegrationCondition> Conditions { get; init; } = Array.Empty<IntegrationCondition>();
         public string ActionType { get; init; }
 
@@ -71,7 +74,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public DateTime CreatedAtUtc { get; init; }
         public DateTime UpdatedAtUtc { get; init; }
 
-        public SrsEventType Trigger => SrsEventTypes.Find(TriggerType);
+        /// <summary>The trigger events this server knows, in the order they were added.</summary>
+        public IReadOnlyList<SrsEventType> Triggers =>
+            TriggerTypes.Select(SrsEventTypes.Find).Where(t => t != null).ToList();
+
+        public bool IsTriggeredBy(string eventType) => TriggerTypes.Contains(eventType, StringComparer.Ordinal);
 
         /// <summary>Delay before retry number <paramref name="attempt"/> (1 = the first retry).</summary>
         public TimeSpan RetryDelay(int attempt)

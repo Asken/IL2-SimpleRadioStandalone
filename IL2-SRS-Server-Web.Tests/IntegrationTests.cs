@@ -88,6 +88,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public void FieldsForSeveralEventsSayWhichEventsHaveThem()
+        {
+            var fields = EventData.Fields(new[] { SrsEventTypes.ServerStarted, SrsEventTypes.ClientConnected });
+
+            Assert.Empty(fields.Single(f => f.Field.Path == "event.type").OnlyIn);
+            Assert.Equal(new[] { SrsEventTypes.ServerStarted }, fields.Single(f => f.Field.Path == "server.port").OnlyIn);
+            Assert.Equal(new[] { SrsEventTypes.ClientConnected }, fields.Single(f => f.Field.Path == "client.name").OnlyIn);
+            Assert.Equal(fields.Count, fields.Select(f => f.Field.Path).Distinct().Count());
+        }
+
+        [Fact]
         public void SampleDataCoversEveryDocumentedField()
         {
             foreach (var type in SrsEventTypes.All)
@@ -133,7 +144,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 
             var moved = store.Save(new IntegrationDefinition
             {
-                Id = saved.Id, Name = "Other", TriggerType = "client.connected", ActionType = "other",
+                Id = saved.Id, Name = "Other", TriggerTypes = new[] { "client.connected" }, ActionType = "other",
                 ActionConfig = new JsonObject()
             });
             Assert.Empty(moved.SecretHints);
@@ -198,7 +209,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             {
                 Id = id,
                 Name = name,
-                TriggerType = trigger,
+                TriggerTypes = trigger.Split(','),
                 Conditions = conditions,
                 ActionType = RecordingAction.ActionType,
                 ActionConfig = config
@@ -217,8 +228,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             events.EventPublished += published.Add;
 
             Assert.Equal("Enter a name.", service.Save(IntegrationStoreTests.Integration(new JsonObject(), name: " "), "admin", out _));
-            Assert.Equal("Choose the event that runs this integration.",
+            Assert.Equal("\"nope\" is not an event type.",
                 service.Save(IntegrationStoreTests.Integration(new JsonObject(), trigger: "nope"), "admin", out _));
+            Assert.Equal("Add the event that runs this integration.", service.Validate(new IntegrationDefinition
+            {
+                Name = "No events", ActionType = RecordingAction.ActionType, ActionConfig = new JsonObject { ["token"] = "t" }
+            }).FirstError);
             Assert.Equal("Enter a token.", service.Save(IntegrationStoreTests.Integration(new JsonObject()), "admin", out _));
 
             Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "a-secret-token" }),
@@ -244,7 +259,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             var draft = new IntegrationDefinition
             {
                 Name = "",
-                TriggerType = "client.connected",
+                TriggerTypes = new[] { "client.connected" },
                 Conditions = new[]
                 {
                     new IntegrationCondition("", ConditionOperator.GreaterThan, "ignored: no field"),
@@ -298,13 +313,30 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             });
             var test = await service.TestAsync(draft, CancellationToken.None);
 
-            Assert.True(test.Result.IsSuccess);
-            Assert.False(test.ConditionsMatchSample);
+            var single = Assert.Single(test.Runs);
+            Assert.True(test.Succeeded);
+            Assert.Equal(SrsEventTypes.ClientConnected, single.Event);
+            Assert.False(single.ConditionsMatchSample);
             Assert.True(action.Runs.TryDequeue(out var run));
             Assert.True(run.IsTest);
             Assert.Equal("stored-secret-value", run.Config["token"]!.GetValue<string>());
             Assert.Equal("Hartmann", EventData.AsText(EventData.Resolve(run.Data, "client.name")));
             Assert.Empty(service.Store.QueryExecutions());
+        }
+
+        [Fact]
+        public async Task TestRunsOncePerTriggerEventWithItsExampleData()
+        {
+            using var temp = new TempDirectory();
+            var (service, _, action) = Create(temp);
+
+            var test = await service.TestAsync(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "t" },
+                trigger: "server.started,server.stopped"), CancellationToken.None);
+
+            Assert.True(test.Succeeded);
+            Assert.Equal(new[] { SrsEventTypes.ServerStarted, SrsEventTypes.ServerStopped }, test.Runs.Select(r => r.Event));
+            Assert.Equal(new[] { "server.started", "server.stopped" },
+                action.Runs.Select(r => EventData.AsText(EventData.Resolve(r.Data, "event.type"))));
         }
 
         internal static (IntegrationService, ServerEvents, RecordingAction) Create(TempDirectory temp)
@@ -338,6 +370,25 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Equal("Red joins", run.IntegrationName);
             Assert.Equal(ExecutionStatus.Queued, run.Status);
             Assert.Equal("Hartmann", EventData.AsText(EventData.Resolve(JsonDocument.Parse(run.Data).RootElement, "client.name")));
+        }
+
+        [Fact]
+        public void QueuesRunsForEveryTriggerEventOfAnIntegration()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "t" }, name: "Status",
+                trigger: "server.started,server.stopped"), "admin", out var saved));
+            Assert.Equal(new[] { "server.started", "server.stopped" }, service.Store.Get(saved.Id).TriggerTypes);
+
+            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStarted, "system", "started", EventPayload.Server(6002, 0)));
+            dispatcher.Match(Connected());
+            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStopped, "admin", "stopped", EventPayload.Server(6002, 3)));
+
+            Assert.Equal(new[] { "server.stopped", "server.started" },
+                service.Store.QueryExecutions().Select(r => r.EventType));
         }
 
         [Fact]
@@ -436,7 +487,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             var error = service.Save(new IntegrationDefinition
             {
                 Name = name,
-                TriggerType = "client.connected",
+                TriggerTypes = new[] { "client.connected" },
                 Conditions = condition == null ? Array.Empty<IntegrationCondition>() : new[] { condition },
                 ActionType = RecordingAction.ActionType,
                 ActionConfig = new JsonObject { ["token"] = "a-secret-token" },

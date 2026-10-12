@@ -14,13 +14,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
 {
     public sealed record ConditionDto(string Field, string Operator, string Value);
 
-    public sealed record IntegrationResponse(long Id, string Name, string Description, bool Enabled, string Trigger,
+    public sealed record IntegrationResponse(long Id, string Name, string Description, bool Enabled,
+        IReadOnlyList<string> Triggers,
         IReadOnlyList<ConditionDto> Conditions, string Action, JsonObject Config,
         IReadOnlyDictionary<string, string> StoredSecrets, string RetryMode, int MaxRetries, DateTime CreatedAtUtc,
         DateTime UpdatedAtUtc);
 
     /// <summary>Secret settings left empty keep their stored value when the action is unchanged.</summary>
-    public sealed record IntegrationRequest(string Name, string Description, bool? Enabled, string Trigger,
+    public sealed record IntegrationRequest(string Name, string Description, bool? Enabled,
+        IReadOnlyList<string> Triggers,
         IReadOnlyList<ConditionDto> Conditions, string Action, JsonObject Config, string RetryMode, int? MaxRetries);
 
     public sealed record IntegrationRunResponse(long Id, long IntegrationId, string IntegrationName, string Action,
@@ -30,8 +32,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
     public sealed record ActionTypeResponse(string Type, string Label, string Description,
         IReadOnlyCollection<string> SecretFields);
 
-    public sealed record IntegrationTestResponse(bool Succeeded, string Status, string Message,
+    public sealed record IntegrationTestRunResponse(string Event, bool Succeeded, string Status, string Message,
         bool ConditionsMatchSample);
+
+    public sealed record IntegrationTestResponse(bool Succeeded, IReadOnlyList<IntegrationTestRunResponse> Runs);
 
     /// <summary>Integrations under /api/v1/integrations; changes need the write scope.</summary>
     internal static class IntegrationEndpoints
@@ -65,10 +69,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
                     async (IntegrationRequest request, IntegrationService service, CancellationToken cancellationToken) =>
                     {
                         var test = await service.TestAsync(ToDefinition(0, request, null), cancellationToken);
-                        return Results.Ok(new IntegrationTestResponse(test.Result.IsSuccess, test.Result.Status,
-                            test.Result.Message, test.ConditionsMatchSample));
+                        return Results.Ok(new IntegrationTestResponse(test.Succeeded, test.Runs
+                            .Select(r => new IntegrationTestRunResponse(r.Event?.Type, r.Result.IsSuccess,
+                                r.Result.Status, r.Result.Message, r.ConditionsMatchSample))
+                            .ToList()));
                     }))
-                .WithSummary("Run an integration's action once with example data for its trigger, without saving it");
+                .WithSummary("Run an integration's action once per trigger event with example data, without saving it");
 
             api.MapGet("/integrations/runs", (string status, long? integration, int? limit, IntegrationService service) =>
                     service.Store.QueryExecutions(status, integration, limit ?? 200).Select(ToRun))
@@ -106,7 +112,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
                 Name = request.Name,
                 Description = request.Description,
                 Enabled = request.Enabled ?? existing?.Enabled ?? true,
-                TriggerType = request.Trigger,
+                TriggerTypes = request.Triggers ?? Array.Empty<string>(),
                 Conditions = (request.Conditions ?? Array.Empty<ConditionDto>())
                     .Select(c => new IntegrationCondition(c.Field, c.Operator ?? ConditionOperator.Is, c.Value))
                     .ToList(),
@@ -126,7 +132,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
             }
 
             return new IntegrationResponse(integration.Id, integration.Name, integration.Description,
-                integration.Enabled, integration.TriggerType,
+                integration.Enabled, integration.TriggerTypes,
                 integration.Conditions.Select(c => new ConditionDto(c.Field, c.Operator, c.Value)).ToList(),
                 integration.ActionType, config, integration.SecretHints,
                 integration.RetryMode.ToString().ToLowerInvariant(), integration.MaxRetries, integration.CreatedAtUtc,

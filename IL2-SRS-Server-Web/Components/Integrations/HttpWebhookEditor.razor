@@ -61,7 +61,7 @@
     <TemplateHelp Escaping="@BodyEscaping" />
 </div>
 
-<TemplatePreview Label="Body preview" Trigger="Trigger" Render="data => HttpWebhookAction.BuildBody(Config, data)" />
+<TemplatePreview Label="Body preview" Triggers="Triggers" Render="data => HttpWebhookAction.BuildBody(Config, data)" />
 
 @code {
     private string BodyEscaping => HttpWebhookAction.IsJson(HttpWebhookAction.ContentType(Config))

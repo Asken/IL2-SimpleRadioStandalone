@@ -83,7 +83,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
         {
             new("integration.id", "number", "Integration id", 3),
             new("integration.name", "string", "Integration name", "Post joins to Discord"),
-            new("integration.trigger", "string", "Trigger event type", "client.connected"),
+            new("integration.triggers", "string", "Trigger event types, comma-separated",
+                "server.started,server.stopped"),
             new("integration.action", "string", "Action type", "discord-webhook")
         };
 

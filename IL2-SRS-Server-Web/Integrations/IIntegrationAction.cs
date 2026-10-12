@@ -53,8 +53,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>Hints for stored secrets ("ends in 0Jdl"), keyed by field; their values in Config are null.</summary>
         [Parameter] public IReadOnlyDictionary<string, string> SecretHints { get; set; } = new Dictionary<string, string>();
 
-        /// <summary>The selected trigger event, for field pickers and previews; may be null.</summary>
-        [Parameter] public SrsEventType Trigger { get; set; }
+        /// <summary>The selected trigger events, for field pickers and previews; empty until one is added.</summary>
+        [Parameter] public IReadOnlyList<SrsEventType> Triggers { get; set; } = Array.Empty<SrsEventType>();
 
         [Parameter] public EventCallback ConfigChanged { get; set; }
 

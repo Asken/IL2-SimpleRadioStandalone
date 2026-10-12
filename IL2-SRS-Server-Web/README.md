@@ -195,15 +195,22 @@ curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/client
 
 ## Integrations
 
-An integration runs an action when an event happens: pick the trigger event, optional conditions on the event
-data, and the action. **Test** runs it once with example data. Webhook URLs and headers are stored encrypted with the
-keys in `keys/` and never shown again; leave them empty when editing to keep the stored value.
+An integration runs an action when one of its trigger events happens: add one or more events (for example
+**Server started** and **Server stopped**), optional conditions on the event data, and the action. **Test** runs it
+once for each trigger event with example data. Webhook URLs and headers are stored encrypted with the keys in `keys/`
+and never shown again; leave them empty when editing to keep the stored value.
 
 Messages and request bodies are [Scriban](https://github.com/scriban/scriban/blob/master/doc/language.md) templates
 over the event data shown on the integration page, with a live preview:
 
 ```
 {{ client.name }} joined {{ client.coalitionName }}{{ if client.coalition == 1 }} 🔴{{ end }}
+```
+
+With several trigger events, `event.type` tells them apart:
+
+```
+{{ if event.type == "server.started" }}🟢 Server online{{ else }}🔴 Server offline{{ end }}
 ```
 
 - **Post to Discord**: values from the event are Markdown-escaped, so a pilot called `**Admin**` shows as written,

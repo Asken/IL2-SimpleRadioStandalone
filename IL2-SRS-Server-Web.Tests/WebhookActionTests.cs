@@ -331,7 +331,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
     public class ActionEditorTests
     {
         private static async Task<string> Render<T>(JsonObject config, IReadOnlyDictionary<string, string> hints = null,
-            IReadOnlyDictionary<string, string> errors = null)
+            IReadOnlyDictionary<string, string> errors = null, IReadOnlyList<SrsEventType> triggers = null)
             where T : IComponent
         {
             await using var services = new ServiceCollection().BuildServiceProvider();
@@ -342,7 +342,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 {
                     [nameof(IntegrationActionEditor.Config)] = config,
                     [nameof(IntegrationActionEditor.SecretHints)] = hints ?? new Dictionary<string, string>(),
-                    [nameof(IntegrationActionEditor.Trigger)] = SrsEventTypes.ClientConnected,
+                    [nameof(IntegrationActionEditor.Triggers)] = triggers ?? new[] { SrsEventTypes.ClientConnected },
                     [nameof(IntegrationActionEditor.Errors)] = errors ?? new Dictionary<string, string>()
                 }));
                 return WebUtility.HtmlDecode(output.ToHtmlString());
@@ -373,6 +373,20 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Contains("aria-invalid=\"true\" aria-describedby=\"config-url-error\"", html);
             Assert.Contains("<span id=\"config-url-error\" class=\"field-error\">Enter the URL.</span>", html);
             Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "aria-invalid"));
+        }
+
+        [Fact]
+        public async Task PreviewsTheMessageForEachTriggerEvent()
+        {
+            var html = await Render<DiscordWebhookEditor>(new JsonObject
+            {
+                ["content"] = "{{ if event.type == \"server.started\" }}🟢 online{{ else }}🔴 offline{{ end }}"
+            }, triggers: new[] { SrsEventTypes.ServerStarted, SrsEventTypes.ServerStopped });
+
+            Assert.Contains("Preview · Server started", html);
+            Assert.Contains("🟢 online", html);
+            Assert.Contains("Preview · Server stopped", html);
+            Assert.Contains("🔴 offline", html);
         }
 
         [Fact]

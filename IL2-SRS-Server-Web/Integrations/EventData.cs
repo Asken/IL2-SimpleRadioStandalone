@@ -13,6 +13,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     /// event's payload, e.g. <c>{ "event": { "type": "client.connected", … }, "client": { "name": … } }</c>.
     /// Conditions and templates address it by dotted paths.
     /// </summary>
+    /// <summary>A field available to an integration; <see cref="OnlyIn"/> is empty when every trigger event has it.</summary>
+    public sealed record EventFieldUse(SrsEventField Field, IReadOnlyList<SrsEventType> OnlyIn);
+
     public static class EventData
     {
         public static JsonElement From(SrsEvent srsEvent)
@@ -40,6 +43,37 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public static IEnumerable<SrsEventField> Fields(SrsEventType type)
         {
             return SrsEventTypes.CommonFields.Concat(type?.Fields ?? Array.Empty<SrsEventField>());
+        }
+
+        /// <summary>
+        /// The fields an integration on several events can use: <c>event.*</c> and each event's payload fields,
+        /// each once. <see cref="EventFieldUse.OnlyIn"/> lists the events a field is limited to.
+        /// </summary>
+        public static IReadOnlyList<EventFieldUse> Fields(IReadOnlyList<SrsEventType> types)
+        {
+            var fields = SrsEventTypes.CommonFields
+                .Select(f => (Field: f, In: types.ToList()))
+                .ToList();
+            foreach (var type in types)
+            {
+                foreach (var field in type.Fields)
+                {
+                    var index = fields.FindIndex(f => f.Field.Path == field.Path);
+                    if (index < 0)
+                    {
+                        fields.Add((field, new List<SrsEventType> { type }));
+                    }
+                    else if (!fields[index].In.Contains(type))
+                    {
+                        fields[index].In.Add(type);
+                    }
+                }
+            }
+
+            return fields
+                .Select(f => new EventFieldUse(f.Field,
+                    f.In.Count == types.Count ? Array.Empty<SrsEventType>() : f.In))
+                .ToList();
         }
 
         /// <summary>The value at a dotted path, or null when it is missing.</summary>

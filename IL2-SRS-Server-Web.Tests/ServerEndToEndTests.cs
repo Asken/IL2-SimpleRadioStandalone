@@ -241,7 +241,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             long id;
             using (var invalid = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
             {
-                invalid.Content = JsonContent.Create(new { name = "", trigger = "admin.setting_changed", action = RecordingAction.ActionType });
+                invalid.Content = JsonContent.Create(new { name = "", triggers = new[] { "admin.setting_changed" }, action = RecordingAction.ActionType });
                 using var response = await _http.SendAsync(invalid, token);
                 Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
                 var body = await response.Content.ReadFromJsonAsync<JsonElement>(token);
@@ -254,7 +254,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 create.Content = JsonContent.Create(new
                 {
                     name = "Channel limit watch",
-                    trigger = "admin.setting_changed",
+                    triggers = new[] { "admin.setting_changed" },
                     conditions = new[] { new { field = "setting.key", @operator = "is", value = "CHANNEL_LIMIT" } },
                     action = RecordingAction.ActionType,
                     config = new { token = "host-secret-value" }

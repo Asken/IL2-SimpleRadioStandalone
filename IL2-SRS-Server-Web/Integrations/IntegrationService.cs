@@ -10,17 +10,23 @@ using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {
-    /// <summary>The outcome of a test run from the integration page.</summary>
-    public sealed record IntegrationTestResult(IntegrationResult Result, bool ConditionsMatchSample);
+    /// <summary>A test run with example data for one trigger event (null when the integration wasn't valid).</summary>
+    public sealed record IntegrationTestRun(SrsEventType Event, IntegrationResult Result, bool ConditionsMatchSample);
+
+    /// <summary>The outcome of a test from the integration page: one run per trigger event.</summary>
+    public sealed record IntegrationTestResult(IReadOnlyList<IntegrationTestRun> Runs)
+    {
+        public bool Succeeded => Runs.Count > 0 && Runs.All(r => r.Result.IsSuccess);
+    }
 
     /// <summary>
-    /// What is wrong with an integration, keyed by field in the order of the form: <c>name</c>, <c>trigger</c>,
+    /// What is wrong with an integration, keyed by field in the order of the form: <c>name</c>, <c>triggers</c>,
     /// <c>conditions[0].value</c>, <c>action</c>, <c>config.webhookUrl</c>, <c>maxRetries</c>.
     /// </summary>
     public sealed class IntegrationValidation
     {
         public const string Name = "name";
-        public const string Trigger = "trigger";
+        public const string Triggers = "triggers";
         public const string Action = "action";
         public const string MaxRetries = "maxRetries";
 
@@ -81,9 +87,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 errors[IntegrationValidation.Name] = "The name can be at most 100 characters.";
             }
 
-            if (SrsEventTypes.Find(draft.TriggerType) == null)
+            if (draft.TriggerTypes.Count == 0)
             {
-                errors[IntegrationValidation.Trigger] = "Choose the event that runs this integration.";
+                errors[IntegrationValidation.Triggers] = "Add the event that runs this integration.";
+            }
+            else if (draft.TriggerTypes.FirstOrDefault(t => SrsEventTypes.Find(t) == null) is { } unknown)
+            {
+                errors[IntegrationValidation.Triggers] = $"\"{unknown}\" is not an event type.";
             }
 
             for (var i = 0; i < draft.Conditions.Count; i++)
@@ -165,7 +175,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 Name = draft.Name.Trim(),
                 Description = draft.Description,
                 Enabled = draft.Enabled,
-                TriggerType = draft.TriggerType,
+                TriggerTypes = draft.TriggerTypes.Distinct(StringComparer.Ordinal).ToList(),
                 // Rows without a field are unfinished rows on the form.
                 Conditions = draft.Conditions.Where(c => !string.IsNullOrWhiteSpace(c.Field)).ToList(),
                 ActionType = draft.ActionType,
@@ -208,27 +218,39 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             return true;
         }
 
-        /// <summary>Runs the action once with example data for the trigger event, without saving or queueing.</summary>
+        /// <summary>
+        /// Runs the action once for each trigger event with example data for it, without saving or queueing.
+        /// </summary>
         public async Task<IntegrationTestResult> TestAsync(IntegrationDefinition draft, CancellationToken cancellationToken)
         {
             var validation = Validate(draft);
             if (!validation.IsValid)
             {
-                return new IntegrationTestResult(IntegrationResult.Fail(validation.FirstError), false);
+                return new IntegrationTestResult(new[]
+                {
+                    new IntegrationTestRun(null, IntegrationResult.Fail(validation.FirstError), false)
+                });
             }
 
-            var trigger = SrsEventTypes.Find(draft.TriggerType);
-            var data = EventData.Sample(trigger);
-            var context = new IntegrationExecutionContext
+            var action = FindAction(draft.ActionType);
+            var config = WithStoredSecrets(draft);
+            var runs = new List<IntegrationTestRun>();
+            foreach (var trigger in draft.Triggers.Distinct())
             {
-                Integration = draft,
-                Config = WithStoredSecrets(draft),
-                EventType = trigger,
-                Data = data
-            };
+                var data = EventData.Sample(trigger);
+                var context = new IntegrationExecutionContext
+                {
+                    Integration = draft,
+                    Config = (JsonObject)config.DeepClone(),
+                    EventType = trigger,
+                    Data = data
+                };
 
-            var result = await RunAsync(FindAction(draft.ActionType), context, cancellationToken);
-            return new IntegrationTestResult(result, EventData.Matches(data, draft.Conditions));
+                var result = await RunAsync(action, context, cancellationToken);
+                runs.Add(new IntegrationTestRun(trigger, result, EventData.Matches(data, draft.Conditions)));
+            }
+
+            return new IntegrationTestResult(runs);
         }
 
         /// <summary>Runs an action with the timeout; exceptions become temporary failures.</summary>
@@ -290,7 +312,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 {
                     ["id"] = integration.Id,
                     ["name"] = integration.Name,
-                    ["trigger"] = integration.TriggerType,
+                    ["triggers"] = string.Join(",", integration.TriggerTypes),
                     ["action"] = integration.ActionType,
                     ["enabled"] = integration.Enabled
                 }
