@@ -99,6 +99,53 @@ PRAGMA user_version = 1;";
             version.CommandText = "PRAGMA user_version;";
             Assert.Equal((long)SrsDatabase.SchemaVersion, (long)version.ExecuteScalar());
         }
+
+        [Theory]
+        // Upstream 1.0.5.0: version 2 is the coalition channel names, without typed events or integrations.
+        [InlineData(2, false)]
+        // This branch before the merge: version 3 had typed events and integrations, but no coalition names.
+        [InlineData(3, true)]
+        public void UpgradesDatabasesNumberedByOtherBuilds(int userVersion, bool hasTypedEvents)
+        {
+            using var temp = new TempDirectory();
+            var path = temp.File(SrsDatabase.FileName);
+            using (var connection = new SqliteConnection("Data Source=" + path))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_at TEXT NOT NULL, category TEXT NOT NULL,
+    actor TEXT NOT NULL, message TEXT NOT NULL" + (hasTypedEvents ? ", type TEXT, client_guid TEXT, payload TEXT" : "") + @");
+CREATE TABLE channel_names (channel INTEGER PRIMARY KEY, name TEXT NOT NULL);
+" + (hasTypedEvents
+                    ? "CREATE TABLE integrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);"
+                    : "CREATE TABLE coalition_channel_names (coalition INTEGER NOT NULL, channel INTEGER NOT NULL, " +
+                      "name TEXT NOT NULL, PRIMARY KEY (coalition, channel));") + @"
+PRAGMA user_version = " + userVersion + ";";
+                command.ExecuteNonQuery();
+            }
+
+            SqliteConnection.ClearAllPools();
+            var database = new SrsDatabase(path);
+
+            using var check = database.Open();
+            foreach (var (table, column) in new[]
+                     {
+                         ("events", "payload"), ("coalition_channel_names", "name"),
+                         ("integrations", "name"), ("integration_executions", "status")
+                     })
+            {
+                using var columns = check.CreateCommand();
+                columns.CommandText = "SELECT COUNT(*) FROM pragma_table_info($table) WHERE name = $column;";
+                columns.Parameters.AddWithValue("$table", table);
+                columns.Parameters.AddWithValue("$column", column);
+                Assert.True((long)columns.ExecuteScalar() == 1, $"{table}.{column} is missing");
+            }
+
+            using var version = check.CreateCommand();
+            version.CommandText = "PRAGMA user_version;";
+            Assert.Equal((long)SrsDatabase.SchemaVersion, (long)version.ExecuteScalar());
+        }
     }
 
     public class ClientEventRecorderTests

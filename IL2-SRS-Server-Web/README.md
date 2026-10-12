@@ -174,7 +174,8 @@ other keys.
 | `POST /api/v1/clients/{guid}/mute`, `/unmute` | write | Server-side mute |
 | `GET /api/v1/settings` | read | All settings, with source and lock state |
 | `PUT /api/v1/settings/{key}` | write | Change a setting; body `{ "value": "true" }` |
-| `GET`, `PUT /api/v1/channel-names` | read, write | Channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
+| `GET`, `PUT /api/v1/channel-names` | read, write | Shared channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
+| `GET`, `PUT /api/v1/channel-names/{coalition}` | read, write | Allied or Axis names (`allies`, `axis`) that replace the shared name for that coalition; same body. `PUT` leaves the shared names and the other coalition unchanged |
 | `GET /api/v1/bans`, `POST /api/v1/bans`, `DELETE /api/v1/bans/{id}` | read, write | Bans; `POST` body `{ "ipAddress": "203.0.113.7", "reason": "...", "durationMinutes": null }` |
 | `GET /api/v1/events?category=&type=&client=&search=&since=&limit=` | read | Event log, newest first, with each event's type and payload |
 | `GET /api/v1/event-types` | read | Event types and their payload fields |

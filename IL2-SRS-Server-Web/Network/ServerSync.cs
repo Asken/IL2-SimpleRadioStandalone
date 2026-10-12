@@ -243,10 +243,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Network
             settings[ServerSettingsKeys.RADIO_COLLISION_EFFECTS.ToString()] = _serverSettings
                 .GetGeneralSetting(ServerSettingsKeys.RADIO_COLLISION_EFFECTS)
                 .StringValue;
-            foreach (var channelName in _serverSettings.GetChannelNames())
-            {
-                settings[ChannelNameSettings.GetSyncedSettingName(channelName.Key)] = channelName.Value;
-            }
+            // Shared names plus the Allied and Axis names; each client shows its own coalition's names.
+            _serverSettings.GetChannelNameSet().AddSyncedSettings(settings);
             return settings;
         }
 

@@ -265,13 +265,55 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         public Dictionary<int, string> GetChannelNames() => _settings.GetChannelNames();
 
+        public Dictionary<int, string> GetChannelNames(int coalition) => _settings.GetChannelNames(coalition);
+
+        public ChannelNameSet GetChannelNameSet() => _settings.GetChannelNameSet();
+
         public void SetChannelNames(IDictionary<int, string> channelNames, string actor)
         {
-            _settings.SetChannelNames(channelNames);
-            var named = _settings.GetChannelNames().Count;
-            Events.Publish(SrsEventTypes.ChannelNamesChanged, actor, $"Updated channel names ({named} named channel(s))",
-                new JsonObject { ["namedChannels"] = named });
+            SetChannelNames(ChannelNameSettings.SharedCoalition, channelNames, actor);
+        }
+
+        /// <summary>Replaces one coalition's names (or the shared names); the other sets are unchanged.</summary>
+        public void SetChannelNames(int coalition, IDictionary<int, string> channelNames, string actor)
+        {
+            _settings.SetChannelNames(coalition, channelNames);
+            var named = _settings.GetChannelNames(coalition).Count;
+            // Shared names keep the original wording so existing event-log searches still match.
+            var message = coalition == ChannelNameSettings.SharedCoalition
+                ? $"Updated channel names ({named} named channel(s))"
+                : $"Updated {ChannelNameSettings.GetCoalitionLabel(coalition)} channel names ({named} named channel(s))";
+            PublishChannelNamesChanged(ChannelNameSettings.GetCoalitionLabel(coalition).ToLowerInvariant(), actor,
+                message);
             Events.PublishSettingsChanged();
+        }
+
+        /// <summary>Replaces the shared, Allied and Axis names together (the Channel Names page).</summary>
+        public void SetChannelNames(ChannelNameSet channelNames, string actor)
+        {
+            _settings.SetChannelNames(channelNames);
+            var saved = _settings.GetChannelNameSet();
+            PublishChannelNamesChanged("all", actor,
+                $"Updated channel names ({saved.Get(ChannelNameSettings.SharedCoalition).Count} shared, " +
+                $"{saved.Get(ChannelNameSettings.AlliesCoalition).Count} Allies, " +
+                $"{saved.Get(ChannelNameSettings.AxisCoalition).Count} Axis)");
+            Events.PublishSettingsChanged();
+        }
+
+        private void PublishChannelNamesChanged(string changed, string actor, string message)
+        {
+            var saved = _settings.GetChannelNameSet();
+            var shared = saved.Get(ChannelNameSettings.SharedCoalition).Count;
+            var allies = saved.Get(ChannelNameSettings.AlliesCoalition).Count;
+            var axis = saved.Get(ChannelNameSettings.AxisCoalition).Count;
+            Events.Publish(SrsEventTypes.ChannelNamesChanged, actor, message, new JsonObject
+            {
+                ["changed"] = changed,
+                ["namedChannels"] = shared + allies + axis,
+                ["shared"] = shared,
+                ["allies"] = allies,
+                ["axis"] = axis
+            });
         }
 
         // API keys (admin UI only; keys cannot manage keys)

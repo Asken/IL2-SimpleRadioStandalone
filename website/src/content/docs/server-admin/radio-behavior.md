@@ -61,6 +61,10 @@ Names are available for all 25 channels and do not change radio frequencies. Cur
 
 Channel 1 has one dynamic exception: while a friendly RCI is on duty, it displays `RCI Control`. The configured name is restored when the RCI becomes inactive.
 
+### Separate Allied and Axis names
+
+The [web server](../web-server/) can also give a channel a different name for each coalition, for example `Kenway` for Allies and `Freya` for Axis on channel 1. On its **Channel Names** page, fill in the **Allies** or **Axis** column; a blank entry uses the **Shared** name. Pilots see their own coalition's names once spawned and the shared names in the lobby. Clients older than this feature, and the Windows server window, use the shared names only.
+
 ## Majority squad labels
 
 Enable **Squad Channel Labels** to append a detected squad tag to eligible channel names:

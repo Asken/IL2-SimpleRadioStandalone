@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## IL2-SRS 1.0.5.0-beta.2
 
 ### Added
 
 - Right-click the Pilot Roster and choose **Fit height to pilots** to turn automatic fitting back on after resizing the window yourself.
 - The web server's theme button now also offers an **IL-2 SRS** theme that matches the client's grey equipment-panel look, alongside Desktop, Light and Dark.
+- Channel names can now differ between Allies and Axis (web server only). The **Channel Names** page has Shared, Allies and Axis columns; an Allied or Axis name replaces the shared name for that coalition, and a blank one uses the shared name. Pilots see their own coalition's names once spawned, and the shared names in the lobby. The REST API adds `GET` and `PUT /api/v1/channel-names/allies` and `/axis`. Clients from before this release show only the shared names. ([#4](https://github.com/riaanjutte/IL2-SimpleRadioStandalone/issues/4))
 
 ### Changed
 
@@ -15,6 +16,12 @@
 
 - The Pilot Roster fits its height to the pilots listed again after updating. In 1.0.5.0-beta.1, any roster height saved by an earlier version was treated as a size you had chosen, which turned automatic fitting off for most existing users. Only dragging the roster's edge now turns it off.
 - The intercom and radio audio channel balance sliders now move the sound steadily from left to right. Previously the inner half of each side worked backwards, so a slider set slightly left played mostly in the right ear and vice versa, and only the outer half moved the sound the expected way. Check your balance settings after updating: positions between the centre and halfway now sound on the side the slider points to.
+
+### Compatibility
+
+- Existing clients and servers remain compatible. The client changes do not require a server update.
+- Allied and Axis channel names need both the web server and the client from this release. Older clients, and the Windows server window, use the shared channel names.
+- The web server upgrades its database (`srs.db`) on first start to store Allied and Axis channel names. An older web server can still open the upgraded database, but ignores those names.
 
 ## IL2-SRS 1.0.5.0-beta.1
 

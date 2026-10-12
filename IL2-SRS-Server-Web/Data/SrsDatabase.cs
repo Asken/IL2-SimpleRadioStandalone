@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
@@ -12,7 +14,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
     {
         public const string FileName = "srs.db";
 
-        /// <summary>Schema changes, in order; migration N takes the database from version N to N + 1.</summary>
+        /// <summary>
+        /// Schema changes, in order; migration N takes the database from version N to N + 1. Every migration must be
+        /// safe to run again (CREATE ... IF NOT EXISTS; ADD COLUMN is skipped when the column exists): when the
+        /// database is behind, all of them run, so databases numbered by an older build or by another branch
+        /// (upstream's version 2 is the coalition channel names) still end up with every table and column.
+        /// </summary>
         private static readonly string[] Migrations =
         {
             // 1: initial schema.
@@ -54,16 +61,24 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used_at TEXT,
     revoked_at   TEXT
 );",
-            // 2: typed events (type, client and JSON payload; null for older rows).
+            // 2: per-coalition channel names (upstream 1.0.5.0).
+            @"
+CREATE TABLE IF NOT EXISTS coalition_channel_names (
+    coalition INTEGER NOT NULL,
+    channel   INTEGER NOT NULL,
+    name      TEXT NOT NULL,
+    PRIMARY KEY (coalition, channel)
+);",
+            // 3: typed events (type, client and JSON payload; null for older rows).
             @"
 ALTER TABLE events ADD COLUMN type TEXT;
 ALTER TABLE events ADD COLUMN client_guid TEXT;
 ALTER TABLE events ADD COLUMN payload TEXT;
 CREATE INDEX IF NOT EXISTS ix_events_type ON events (type);
 CREATE INDEX IF NOT EXISTS ix_events_client_guid ON events (client_guid);",
-            // 3: integrations and their runs (the outbox the dispatcher works through).
+            // 4: integrations and their runs (the outbox the dispatcher works through).
             @"
-CREATE TABLE integrations (
+CREATE TABLE IF NOT EXISTS integrations (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     name          TEXT NOT NULL,
     description   TEXT,
@@ -77,7 +92,7 @@ CREATE TABLE integrations (
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
 );
-CREATE TABLE integration_executions (
+CREATE TABLE IF NOT EXISTS integration_executions (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     integration_id   INTEGER NOT NULL,
     integration_name TEXT NOT NULL,
@@ -93,11 +108,14 @@ CREATE TABLE integration_executions (
     last_error       TEXT,
     result           TEXT
 );
-CREATE INDEX ix_integration_executions_due ON integration_executions (status, next_attempt_at);
-CREATE INDEX ix_integration_executions_integration ON integration_executions (integration_id);"
+CREATE INDEX IF NOT EXISTS ix_integration_executions_due ON integration_executions (status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS ix_integration_executions_integration ON integration_executions (integration_id);"
         };
 
         public static int SchemaVersion => Migrations.Length;
+
+        private static readonly Regex AddColumn = new(@"^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private readonly string _connectionString;
 
@@ -161,17 +179,54 @@ CREATE INDEX ix_integration_executions_integration ON integration_executions (in
             }
 
             using var transaction = connection.BeginTransaction();
-            for (var step = version; step < SchemaVersion; step++)
+            foreach (var migration in Migrations)
             {
-                using var command = connection.CreateCommand();
+                foreach (var statement in migration.Split(';'))
+                {
+                    if (string.IsNullOrWhiteSpace(statement) || HasColumnAlready(connection, transaction, statement))
+                    {
+                        continue;
+                    }
+
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = statement + ";";
+                    command.ExecuteNonQuery();
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
                 command.Transaction = transaction;
-                command.CommandText = Migrations[step] + "\nPRAGMA user_version = " +
-                                      (step + 1).ToString(CultureInfo.InvariantCulture) + ";";
+                command.CommandText = "PRAGMA user_version = " + SchemaVersion.ToString(CultureInfo.InvariantCulture) + ";";
                 command.ExecuteNonQuery();
             }
 
             transaction.Commit();
             WasCreated = version == 0;
+        }
+
+        /// <summary>True for an ALTER TABLE ... ADD COLUMN whose column is already there.</summary>
+        private static bool HasColumnAlready(SqliteConnection connection, SqliteTransaction transaction, string statement)
+        {
+            var match = AddColumn.Match(statement);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT name FROM pragma_table_info($table);";
+            command.Parameters.AddWithValue("$table", match.Groups[1].Value);
+            using var reader = command.ExecuteReader();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(0));
+            }
+
+            return columns.Contains(match.Groups[2].Value);
         }
 
         private static int ExecuteScalarInt(SqliteConnection connection, string sql)

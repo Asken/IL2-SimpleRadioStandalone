@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Localization;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Settings;
+using Ciribob.IL2.SimpleRadio.Standalone.Client.Utils;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using MahApps.Metro.Controls;
 using NLog;
@@ -62,7 +63,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
                 ChannelLimit.Content = settings.GetSetting(ServerSettingsKeys.CHANNEL_LIMIT);
 
-                var channelNames = settings.GetChannelNames();
+                // The names this client sees: shared names plus its own coalition's, never the other side's.
+                var channelNames = settings.GetChannelNames(RadioHelper.GetOwnCoalition());
                 ChannelNames.Content = channelNames.Count == 0
                     ? "-"
                     : channelNames.Count + " configured";

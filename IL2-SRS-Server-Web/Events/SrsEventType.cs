@@ -180,7 +180,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 
         public static readonly SrsEventType ChannelNamesChanged = new("admin.channel_names_changed",
             EventCategory.Admin, "Channel names changed", "An admin updated the channel names.",
-            new SrsEventField[] { new("namedChannels", "number", "Channels that have a name", 6) });
+            new SrsEventField[]
+            {
+                new("changed", "string", "Which names were saved: all, shared, allies or axis", "all"),
+                new("namedChannels", "number", "Named channels in all three sets", 9),
+                new("shared", "number", "Channels with a shared name (both coalitions)", 5),
+                new("allies", "number", "Channels with an Allies name", 2),
+                new("axis", "number", "Channels with an Axis name", 2)
+            });
 
         public static readonly SrsEventType ApiKeyCreated = new("admin.api_key_created", EventCategory.Admin,
             "API key created", "An admin created an API key.", ApiKeyFields);

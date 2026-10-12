@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
@@ -110,6 +111,23 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
                         return Results.Ok(admin.GetChannelNames());
                     }))
                 .WithSummary("Replace all channel names; channels left out have no name");
+            api.MapGet("/channel-names/{coalition}", (string coalition, ServerAdminService admin) =>
+                    TryParseCoalition(coalition, out var value)
+                        ? Results.Ok(admin.GetChannelNames(value))
+                        : CoalitionNotFound(coalition))
+                .WithSummary("Allied or Axis channel names (coalition: allies or axis); these replace the shared names for that coalition");
+            Write(api.MapPut("/channel-names/{coalition}",
+                    (string coalition, ChannelNamesRequest request, ServerAdminService admin, ClaimsPrincipal user) =>
+                    {
+                        if (!TryParseCoalition(coalition, out var value))
+                        {
+                            return CoalitionNotFound(coalition);
+                        }
+
+                        admin.SetChannelNames(value, request?.ChannelNames ?? new Dictionary<int, string>(), Actor(user));
+                        return Results.Ok(admin.GetChannelNames(value));
+                    }))
+                .WithSummary("Replace one coalition's channel names; the shared names and the other coalition are unchanged");
 
             // Bans
             api.MapGet("/bans", (ServerAdminService admin) => admin.GetBans().Select(ToBan))
@@ -175,6 +193,26 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
         private static IResult ClientNotFound(string guid)
         {
             return Results.NotFound(new ErrorResponse($"No connected client {guid}."));
+        }
+
+        private static IResult CoalitionNotFound(string coalition)
+        {
+            return Results.NotFound(new ErrorResponse($"Unknown coalition {coalition}; use allies or axis."));
+        }
+
+        internal static bool TryParseCoalition(string value, out int coalition)
+        {
+            foreach (var candidate in ChannelNameSettings.Coalitions)
+            {
+                if (string.Equals(value, ChannelNameSettings.GetCoalitionLabel(candidate), StringComparison.OrdinalIgnoreCase))
+                {
+                    coalition = candidate;
+                    return true;
+                }
+            }
+
+            coalition = ChannelNameSettings.SharedCoalition;
+            return false;
         }
 
         private static string Actor(ClaimsPrincipal user) => user.Identity?.Name ?? "api";
