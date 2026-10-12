@@ -20,7 +20,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         private static readonly Dictionary<string, string> defaults = DefaultServerSettings.Defaults;
 
         private readonly ConcurrentDictionary<string, string> _settings;
-        private volatile Dictionary<int, string> _channelNames = new Dictionary<int, string>();
+        private volatile ChannelNameSet _channelNames = ChannelNameSet.Empty;
         private int _channelNamesRevision;
 
         public List<double> GlobalFrequencies { get; set; } = new List<double>();
@@ -74,14 +74,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                    result;
         }
 
-        public string GetChannelName(int channel)
+        /// <summary>The coalition's own name for the channel, else the shared name, else null.</summary>
+        public string GetChannelName(int channel, int coalition)
         {
-            return _channelNames.TryGetValue(channel, out var name) ? name : null;
+            return _channelNames.Resolve(channel, coalition);
         }
 
-        public Dictionary<int, string> GetChannelNames()
+        /// <summary>The channel names a client in this coalition sees (shared names overlaid with its own).</summary>
+        public Dictionary<int, string> GetChannelNames(int coalition)
         {
-            return new Dictionary<int, string>(_channelNames);
+            return _channelNames.GetEffective(coalition);
         }
 
         public int ChannelNamesRevision => _channelNamesRevision;
@@ -100,21 +102,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                 }
             }
 
-            var channelNames = new Dictionary<int, string>();
-
             foreach (KeyValuePair<string, string> kvp in encoded)
             {
                 _settings.AddOrUpdate(kvp.Key, kvp.Value, (key, oldVal) => kvp.Value);
 
-                if (ChannelNameSettings.TryParseSyncedSettingName(kvp.Key, out var channel))
-                {
-                    var name = ChannelNameSettings.NormalizeName(kvp.Value);
-                    if (!string.IsNullOrWhiteSpace(name))
-                    {
-                        channelNames[channel] = name;
-                    }
-                }
-                
                 if (kvp.Key.Equals(ServerSettingsKeys.GLOBAL_LOBBY_FREQUENCIES.ToString()))
                 {
                     var freqStringList = kvp.Value.Split(',');
@@ -134,7 +125,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                 }
             }
 
-            _channelNames = channelNames;
+            // Shared names plus any Allied and Axis names (CHANNEL_NAME_ALLIES_n / CHANNEL_NAME_AXIS_n).
+            _channelNames = ChannelNameSet.FromSyncedSettings(encoded);
             Interlocked.Increment(ref _channelNamesRevision);
 
 

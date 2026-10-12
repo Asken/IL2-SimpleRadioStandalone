@@ -73,6 +73,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.RadioOverlayWindow
         private int _lastChannelLimit = -1;
         private int _lastChannelNamesRevision = -1;
         private bool? _lastFriendlyRciActiveForChannelNames;
+        private int? _lastCoalitionForChannelNames;
         private int _lastSquadLabelChannel = -1;
         private string _lastMajoritySquadTag = string.Empty;
         private DateTime _lastSquadLabelRefresh = DateTime.MinValue;
@@ -578,15 +579,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.RadioOverlayWindow
         {
             var channelNamesRevision = SyncedServerSettings.Instance.ChannelNamesRevision;
             var friendlyRciActive = RadioHelper.IsFriendlyRciActive();
+            // Names can differ per coalition, so a side change (e.g. lobby to spawned) must refresh them too.
+            var coalition = RadioHelper.GetOwnCoalition();
             if (!force &&
                 _lastChannelNamesRevision == channelNamesRevision &&
-                _lastFriendlyRciActiveForChannelNames == friendlyRciActive)
+                _lastFriendlyRciActiveForChannelNames == friendlyRciActive &&
+                _lastCoalitionForChannelNames == coalition)
             {
                 return false;
             }
 
             _lastChannelNamesRevision = channelNamesRevision;
             _lastFriendlyRciActiveForChannelNames = friendlyRciActive;
+            _lastCoalitionForChannelNames = coalition;
             foreach (var pair in _channelButtons)
             {
                 var channelName = RadioHelper.GetEffectiveChannelName(pair.Key, null);

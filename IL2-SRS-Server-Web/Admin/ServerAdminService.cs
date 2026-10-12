@@ -241,11 +241,37 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         public Dictionary<int, string> GetChannelNames() => _settings.GetChannelNames();
 
+        public Dictionary<int, string> GetChannelNames(int coalition) => _settings.GetChannelNames(coalition);
+
+        public ChannelNameSet GetChannelNameSet() => _settings.GetChannelNameSet();
+
         public void SetChannelNames(IDictionary<int, string> channelNames, string actor)
         {
+            SetChannelNames(ChannelNameSettings.SharedCoalition, channelNames, actor);
+        }
+
+        /// <summary>Replaces one coalition's names (or the shared names); the other sets are unchanged.</summary>
+        public void SetChannelNames(int coalition, IDictionary<int, string> channelNames, string actor)
+        {
+            _settings.SetChannelNames(coalition, channelNames);
+            var named = _settings.GetChannelNames(coalition).Count;
+            // Shared names keep the original wording so existing event-log searches still match.
+            var message = coalition == ChannelNameSettings.SharedCoalition
+                ? $"Updated channel names ({named} named channel(s))"
+                : $"Updated {ChannelNameSettings.GetCoalitionLabel(coalition)} channel names ({named} named channel(s))";
+            Audit.Write(AuditCategory.Admin, actor, message);
+            Events.PublishSettingsChanged();
+        }
+
+        /// <summary>Replaces the shared, Allied and Axis names together (the Channel Names page).</summary>
+        public void SetChannelNames(ChannelNameSet channelNames, string actor)
+        {
             _settings.SetChannelNames(channelNames);
-            var named = _settings.GetChannelNames().Count;
-            Audit.Write(AuditCategory.Admin, actor, $"Updated channel names ({named} named channel(s))");
+            var saved = _settings.GetChannelNameSet();
+            Audit.Write(AuditCategory.Admin, actor,
+                $"Updated channel names ({saved.Get(ChannelNameSettings.SharedCoalition).Count} shared, " +
+                $"{saved.Get(ChannelNameSettings.AlliesCoalition).Count} Allies, " +
+                $"{saved.Get(ChannelNameSettings.AxisCoalition).Count} Axis)");
             Events.PublishSettingsChanged();
         }
 

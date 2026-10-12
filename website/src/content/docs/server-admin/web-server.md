@@ -19,7 +19,7 @@ The web server is new. The Windows server window remains available while the web
 
 - **Dashboard** with listener health, uptime, clients, voice links, recent transmitters and recent activity.
 - **Clients**: search, mute, kick, and ban with a reason and optional duration.
-- **Settings** and **Channel Names**, applied immediately and sent to connected clients.
+- **Settings** and **Channel Names**, applied immediately and sent to connected clients. Channel names can be shared, or set separately for Allies and Axis.
 - **Bans** with reason, who banned, and expiry. Ban an IP address directly or remove a ban.
 - **Event log** of logins, admin actions, server start and stop, client connections and refused connections. Old events are removed automatically.
 - **API keys** for the REST API, with read-only or read-write access, and an interactive **API reference**.
