@@ -7,6 +7,10 @@
 - Right-click the Pilot Roster and choose **Fit height to pilots** to turn automatic fitting back on after resizing the window yourself.
 - The web server's theme button now also offers an **IL-2 SRS** theme that matches the client's grey equipment-panel look, alongside Desktop, Light and Dark.
 
+### Changed
+
+- The web server no longer draws a focus outline around the page heading in any theme. Screen readers still move to the heading when you open a page.
+
 ### Fixed
 
 - The Pilot Roster fits its height to the pilots listed again after updating. In 1.0.5.0-beta.1, any roster height saved by an earlier version was treated as a size you had chosen, which turned automatic fitting off for most existing users. Only dragging the roster's edge now turns it off.
