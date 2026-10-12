@@ -65,6 +65,38 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public async Task LoginShowsPasswordErrorsOnTheField()
+        {
+            var token = TestContext.Current.CancellationToken;
+            var login = await _http.GetStringAsync("/login", token);
+            Assert.DoesNotContain("aria-invalid", login);
+            var antiforgery = System.Text.RegularExpressions.Regex
+                .Match(login, "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value;
+            Assert.NotEmpty(antiforgery);
+
+            async Task<string> LogIn(string password)
+            {
+                using var form = new FormUrlEncodedContent(new[]
+                {
+                    new System.Collections.Generic.KeyValuePair<string, string>("__RequestVerificationToken", antiforgery),
+                    new System.Collections.Generic.KeyValuePair<string, string>("returnUrl", "/"),
+                    new System.Collections.Generic.KeyValuePair<string, string>("password", password)
+                });
+                using var response = await _http.PostAsync("/account/login", form, token);
+                Assert.Contains("/login", response.RequestMessage!.RequestUri!.AbsolutePath);
+                return await response.Content.ReadAsStringAsync(token);
+            }
+
+            var empty = await LogIn("");
+            Assert.Contains("Enter the admin password.", empty);
+            Assert.Contains("aria-invalid=\"true\"", empty);
+
+            var wrong = await LogIn("wrong-password");
+            Assert.Contains("Incorrect password.", wrong);
+            Assert.Contains("aria-describedby=\"password-error\"", wrong);
+        }
+
+        [Fact]
         public async Task ApiRequiresAKeyWithTheRightScope()
         {
             var keys = _app.Services.GetRequiredService<ApiKeyStore>();

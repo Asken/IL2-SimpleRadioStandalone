@@ -153,15 +153,29 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         public int ActiveBanCount => _bans.ActiveCount;
 
+        /// <summary>Checks an address to ban; returns an error message or null.</summary>
+        public static string ValidateIpAddress(string ipAddress)
+        {
+            var text = (ipAddress ?? string.Empty).Trim();
+            if (text.Length == 0)
+            {
+                return "Enter the IP address to ban.";
+            }
+
+            return IPAddress.TryParse(text, out _) ? null : "Enter a valid IPv4 or IPv6 address, e.g. 203.0.113.7.";
+        }
+
         /// <summary>Bans an IP address directly; returns an error message or null.</summary>
         public string BanAddress(string ipAddress, string playerName, string reason, TimeSpan? duration, string actor,
             out BanRecord ban)
         {
             ban = null;
-            if (!IPAddress.TryParse((ipAddress ?? string.Empty).Trim(), out var address))
+            if (ValidateIpAddress(ipAddress) is { } error)
             {
-                return "Enter a valid IPv4 or IPv6 address.";
+                return error;
             }
+
+            var address = IPAddress.Parse(ipAddress.Trim());
 
             ban = _bans.Add(address, playerName, reason, actor, ExpiresAt(duration));
             var disconnected = _serverState.DisconnectAddress(address);

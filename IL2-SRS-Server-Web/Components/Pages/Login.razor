@@ -8,21 +8,20 @@
 <PageTitle>Log in · IL2-SRS Server</PageTitle>
 
 <main class="login">
-    <form method="post" action="account/login" class="login-card">
+    <form method="post" action="account/login" class="login-card" novalidate>
         <AntiforgeryToken />
         <div class="brand">
             <img src="favicon.ico" alt="" width="28" height="28" />
             <h1>IL2-SRS Server</h1>
         </div>
-        @if (Error != null)
-        {
-            <p class="alert alert-error" role="alert">Incorrect password.</p>
-        }
         <input type="hidden" name="returnUrl" value="@ReturnUrl" />
-        <label>
-            <span>Admin password</span>
-            <input type="password" name="password" autocomplete="current-password" required autofocus />
-        </label>
+        <div class="form-field">
+            <label for="password">Admin password</label>
+            <input id="password" type="password" name="password" autocomplete="current-password" autofocus
+                   aria-invalid="@FieldError.Invalid(PasswordError)"
+                   aria-describedby="@FieldError.DescribedBy("password-error", PasswordError)" />
+            <FieldError Id="password-error" Message="@PasswordError" />
+        </div>
         <button type="submit" class="btn btn-primary">Log in</button>
     </form>
 </main>
@@ -30,6 +29,13 @@
 @code {
     [SupplyParameterFromQuery] private string ReturnUrl { get; set; }
     [SupplyParameterFromQuery] private string Error { get; set; }
+
+    private string PasswordError => Error switch
+    {
+        null => null,
+        "empty" => "Enter the admin password.",
+        _ => "Incorrect password."
+    };
 
     protected override void OnInitialized()
     {
