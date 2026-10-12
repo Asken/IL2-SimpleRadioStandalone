@@ -49,6 +49,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 {
                     var target = IsLocalUrl(returnUrl) ? returnUrl : "/";
 
+                    if (string.IsNullOrEmpty(password))
+                    {
+                        return Results.LocalRedirect("/login?error=empty&returnUrl=" + Uri.EscapeDataString(target));
+                    }
+
                     if (!auth.Verify(password))
                     {
                         events.Publish(SrsEventTypes.AdminLoginFailed, "anonymous",

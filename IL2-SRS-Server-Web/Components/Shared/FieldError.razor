@@ -1,0 +1,17 @@
+@* The error under a form field. Give the field aria-invalid="true" and aria-describedby="@Id" while it shows. *@
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <span id="@Id" class="field-error">@Message</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; }
+    [Parameter] public string Message { get; set; }
+
+    /// <summary>aria-invalid for the field: "true" with an error, otherwise left out.</summary>
+    public static string Invalid(string message) => string.IsNullOrEmpty(message) ? null : "true";
+
+    /// <summary>aria-describedby for the field: the error's id with an error, otherwise left out.</summary>
+    public static string DescribedBy(string id, string message) => string.IsNullOrEmpty(message) ? null : id;
+}

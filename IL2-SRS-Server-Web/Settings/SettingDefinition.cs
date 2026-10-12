@@ -130,6 +130,20 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
         /// <summary>Validates and normalises a value for storage; returns an error message or null.</summary>
         public string Normalize(string value, out string normalized)
         {
+            var expected = Check(value, out normalized);
+            return expected == null ? null : $"{Name} must be {expected}.";
+        }
+
+        /// <summary>Checks a value typed in the admin UI; returns an error message for the field or null.</summary>
+        public string Validate(string value)
+        {
+            var expected = Check(value, out _);
+            return expected == null ? null : $"Enter {expected}.";
+        }
+
+        /// <summary>Normalises a value; returns what was expected instead (e.g. "true or false") or null.</summary>
+        private string Check(string value, out string normalized)
+        {
             value = (value ?? string.Empty).Trim();
             normalized = value;
 
@@ -138,7 +152,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
                 case SettingKind.Toggle:
                     if (!SettingValue.TryParseBool(value, out var flag))
                     {
-                        return $"{Name} must be true or false.";
+                        return "true or false";
                     }
 
                     normalized = flag ? "true" : "false";
@@ -148,7 +162,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
                     if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) ||
                         number < Minimum || number > Maximum)
                     {
-                        return $"{Name} must be a whole number from {Minimum} to {Maximum}.";
+                        return $"a whole number from {Minimum} to {Maximum}";
                     }
 
                     normalized = number.ToString(CultureInfo.InvariantCulture);
@@ -161,7 +175,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
                         if (!double.TryParse(frequency, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz) ||
                             mhz <= 0)
                         {
-                            return $"{Name} must be a comma-separated list of frequencies in MHz, e.g. 248.22,122.3.";
+                            return "a comma-separated list of frequencies in MHz, e.g. 248.22,122.3";
                         }
                     }
 
@@ -171,7 +185,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
                 default:
                     if (value.IndexOfAny(new[] { '\r', '\n' }) >= 0)
                     {
-                        return $"{Name} must be a single line.";
+                        return "a single line of text";
                     }
 
                     return null;
