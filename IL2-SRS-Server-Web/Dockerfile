@@ -19,6 +19,9 @@ RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
 
+# Apply Alpine security fixes released since the base image was built (e.g. zlib CVE-2026-85091).
+RUN apk upgrade --no-cache
+
 # Set by scripts/Publish-DockerImage.ps1; plain builds are labelled "dev".
 ARG VERSION=dev
 ARG REVISION=unknown
