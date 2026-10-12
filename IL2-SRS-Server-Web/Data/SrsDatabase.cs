@@ -60,7 +60,41 @@ ALTER TABLE events ADD COLUMN type TEXT;
 ALTER TABLE events ADD COLUMN client_guid TEXT;
 ALTER TABLE events ADD COLUMN payload TEXT;
 CREATE INDEX IF NOT EXISTS ix_events_type ON events (type);
-CREATE INDEX IF NOT EXISTS ix_events_client_guid ON events (client_guid);"
+CREATE INDEX IF NOT EXISTS ix_events_client_guid ON events (client_guid);",
+            // 3: integrations and their runs (the outbox the dispatcher works through).
+            @"
+CREATE TABLE integrations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    description   TEXT,
+    enabled       INTEGER NOT NULL,
+    trigger_type  TEXT NOT NULL,
+    conditions    TEXT NOT NULL,
+    action_type   TEXT NOT NULL,
+    action_config TEXT NOT NULL,
+    retry_mode    TEXT NOT NULL,
+    max_retries   INTEGER NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE TABLE integration_executions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    integration_id   INTEGER NOT NULL,
+    integration_name TEXT NOT NULL,
+    action_type      TEXT NOT NULL,
+    event_type       TEXT NOT NULL,
+    event_message    TEXT,
+    data             TEXT NOT NULL,
+    status           TEXT NOT NULL,
+    attempts         INTEGER NOT NULL,
+    created_at       TEXT NOT NULL,
+    next_attempt_at  TEXT,
+    finished_at      TEXT,
+    last_error       TEXT,
+    result           TEXT
+);
+CREATE INDEX ix_integration_executions_due ON integration_executions (status, next_attempt_at);
+CREATE INDEX ix_integration_executions_integration ON integration_executions (integration_id);"
         };
 
         public static int SchemaVersion => Migrations.Length;

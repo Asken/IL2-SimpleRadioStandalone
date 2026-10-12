@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject ServerAdminService Admin
 @inject AdminAuthOptions AuthOptions
+@inject IEnumerable<AdminNavItem> ExtraNavItems
 
 <div class="shell">
     <header class="topbar">
@@ -31,7 +32,13 @@
         <NavLink href="channels">Channel Names</NavLink>
         <NavLink href="bans">Bans</NavLink>
         <NavLink href="events">Event Log</NavLink>
+        <NavLink href="integrations">Integrations</NavLink>
+        <NavLink href="integration-runs">Integration Runs</NavLink>
         <NavLink href="api-keys">API Keys</NavLink>
+        @foreach (var item in ExtraNavItems)
+        {
+            <NavLink href="@item.Href">@item.Label</NavLink>
+        }
     </nav>
 
     <main class="content">

@@ -17,6 +17,9 @@ What it adds over the WPF server:
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
 - Live event log of logins, admin actions, server start/stop, client connections, name and coalition changes and
   radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
+- Integrations: run an action when an event happens, optionally only when the event data matches conditions
+  (for example only Red pilots). Runs are queued, kept across restarts, retried if configured and listed under
+  **Integration Runs**.
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
 - Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
@@ -30,10 +33,10 @@ instead. The first log line shows which folder is in use.
 
 | File | Purpose |
 | --- | --- |
-| `srs.db` | Settings, channel names, bans, event log, API keys (SQLite, WAL mode) |
+| `srs.db` | Settings, channel names, bans, event log, API keys, integrations (SQLite, WAL mode) |
 | `srs-server.json` | Optional configuration file with the same `SRS_*` keys as the environment |
 | `serverlog.txt` | Full server log (also written to the console) |
-| `keys/` | Keys that protect the admin login cookie |
+| `keys/` | Keys that protect the admin login cookie and encrypt integration secrets (back it up with `srs.db`) |
 | `clients-list.json` | Client export, when **Auto Export List** is on |
 
 On first start, an existing `server.cfg` and `banned.txt` from the WPF server in the data directory are
@@ -176,10 +179,31 @@ other keys.
 | `GET /api/v1/events?category=&type=&client=&search=&since=&limit=` | read | Event log, newest first, with each event's type and payload |
 | `GET /api/v1/event-types` | read | Event types and their payload fields |
 | `DELETE /api/v1/events` | write | Clear the event log |
+| `GET /api/v1/integrations`, `GET /api/v1/integrations/{id}` | read | Integrations (secret settings are never returned) |
+| `POST /api/v1/integrations`, `PUT`, `DELETE /api/v1/integrations/{id}` | write | Create, replace or delete an integration |
+| `POST /api/v1/integrations/test` | write | Run an integration's action once with example data, without saving it |
+| `GET /api/v1/integrations/action-types` | read | Actions an integration can run |
+| `GET /api/v1/integrations/runs?status=&integration=&limit=` | read | Integration runs, newest first |
+| `POST /api/v1/integrations/runs/{id}/retry` | write | Run a finished run again |
 | `POST /api/v1/server/start`, `/stop`, `/restart` | write | Server lifecycle |
 
 ```sh
 curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
+```
+
+## Building on the server
+
+A host can add integration actions, admin pages, navigation links and Settings panels without changing this
+project: reference it and call `Program.Run` from its own `Main`.
+
+```csharp
+public static int Main(string[] args) => Program.Run(args, builder =>
+{
+    builder.Services.AddIntegrationAction<MyAction>();          // implements IIntegrationAction
+    builder.Services.AddAdminPages(typeof(MyPage).Assembly);   // routable components (@page)
+    builder.Services.AddAdminNavItem("my-page", "My Page");
+    builder.Services.AddAdminSettingsSection<MySettingsPanel>();
+});
 ```
 
 ## Development

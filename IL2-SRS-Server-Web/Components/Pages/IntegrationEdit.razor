@@ -1,0 +1,327 @@
+@page "/integrations/new"
+@page "/integrations/{Id:long}"
+@attribute [Authorize]
+@using System.Text.Json.Nodes
+@inject IntegrationService Integrations
+@inject AdminAuthOptions AuthOptions
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id.HasValue ? "Edit integration" : "New integration") · IL2-SRS Server</PageTitle>
+
+<div class="page-head">
+    <h1>@(Id.HasValue ? "Edit integration" : "New integration")</h1>
+</div>
+
+@if (_notFound)
+{
+    <p class="alert alert-error" role="alert">This integration no longer exists. <a href="integrations">Back to integrations</a></p>
+    return;
+}
+
+<form class="panel integration-form" @onsubmit="Save">
+    <p class="muted">Run an action when an event happens, optionally only when the event data matches conditions.</p>
+
+    <div class="field">
+        <label for="name">Name</label>
+        <input id="name" type="text" maxlength="100" placeholder="e.g. Post joins to Discord" @bind="_name" />
+    </div>
+
+    <div class="field">
+        <label for="description">Description</label>
+        <input id="description" type="text" maxlength="500" placeholder="What does this integration do?"
+               @bind="_description" />
+    </div>
+
+    <div class="field field-inline">
+        <label class="switch">
+            <input id="enabled" type="checkbox" role="switch" @bind="_enabled" />
+            <span class="switch-track" aria-hidden="true"></span>
+        </label>
+        <label for="enabled">Enabled</label>
+    </div>
+
+    <div class="field">
+        <label for="trigger">Trigger event</label>
+        <select id="trigger" @bind="_triggerType" @bind:after="TriggerChanged">
+            <option value="">Choose an event</option>
+            @foreach (var category in EventCategory.All)
+            {
+                <optgroup label="@category">
+                    @foreach (var eventType in SrsEventTypes.All.Where(t => t.Category == category))
+                    {
+                        <option value="@eventType.Type">@eventType.Label (@eventType.Type)</option>
+                    }
+                </optgroup>
+            }
+        </select>
+        @if (Trigger != null)
+        {
+            <span class="field-help">@Trigger.Description</span>
+            <details class="schema">
+                <summary>Data available for <code>@Trigger.Type</code></summary>
+                <table class="grid compact">
+                    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+                    <tbody>
+                        @foreach (var field in EventData.Fields(Trigger))
+                        {
+                            <tr><td><code>@field.Path</code></td><td>@field.Type</td><td>@field.Description</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+        }
+    </div>
+
+    <div class="field">
+        <span class="field-label">Conditions</span>
+        <span class="field-help">
+            Optional. All conditions must match the event data for the action to run. Text comparisons ignore case.
+        </span>
+        @foreach (var condition in _conditions)
+        {
+            <div class="condition-row" @key="condition">
+                <select aria-label="Field" @bind="condition.Field" disabled="@(Trigger == null)">
+                    <option value="">Field</option>
+                    @foreach (var field in EventData.Fields(Trigger))
+                    {
+                        <option value="@field.Path">@field.Path</option>
+                    }
+                </select>
+                <select aria-label="Comparison" @bind="condition.Operator">
+                    @foreach (var op in ConditionOperator.All)
+                    {
+                        <option value="@op.Value">@op.Label</option>
+                    }
+                </select>
+                @if (ConditionOperator.NeedsValue(condition.Operator))
+                {
+                    <input type="text" aria-label="Value" placeholder="value" @bind="condition.Value" />
+                }
+                else
+                {
+                    <span></span>
+                }
+                <button type="button" class="btn btn-quiet" title="Remove condition" aria-label="Remove condition"
+                        @onclick="() => _conditions.Remove(condition)">
+                    <Icon Name="x" />
+                </button>
+            </div>
+        }
+        <div>
+            <button type="button" class="btn btn-quiet" @onclick="() => _conditions.Add(new ConditionRow())">+ Add condition</button>
+        </div>
+    </div>
+
+    <div class="field">
+        <label for="action">Action</label>
+        <select id="action" @bind="_actionType" @bind:after="ActionChanged">
+            <option value="">Choose an action</option>
+            @foreach (var available in Integrations.Actions)
+            {
+                <option value="@available.Type">@available.Label</option>
+            }
+        </select>
+        @if (Action != null)
+        {
+            <span class="field-help">@Action.Description</span>
+        }
+        else if (!string.IsNullOrEmpty(_actionType))
+        {
+            <span class="field-help">The action "@_actionType" is not available on this server.</span>
+        }
+    </div>
+
+    @if (Action != null)
+    {
+        <div class="action-config">
+            <DynamicComponent Type="Action.ConfigEditor" Parameters="EditorParameters" />
+        </div>
+    }
+
+    <div class="field-grid">
+        <div class="field">
+            <label for="retryMode">Retry mode</label>
+            <select id="retryMode" @bind="_retryMode">
+                <option value="@RetryMode.None">No retries</option>
+                <option value="@RetryMode.Fixed">Every 30 seconds</option>
+                <option value="@RetryMode.Exponential">Backing off (10 s, 20 s, 40 s … up to 10 min)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="maxRetries">Max retries</label>
+            <input id="maxRetries" type="number" class="input-narrow" min="1" max="@IntegrationDefinition.MaxRetriesLimit"
+                   disabled="@(_retryMode == RetryMode.None)" @bind="_maxRetries" />
+        </div>
+    </div>
+
+    @if (_error != null)
+    {
+        <p class="alert alert-error" role="alert">@_error</p>
+    }
+    @if (_test != null)
+    {
+        <div class="alert @(_test.Result.IsSuccess ? "alert-ok" : "alert-error")" role="status">
+            <strong>@(_test.Result.IsSuccess ? "Test succeeded" : "Test failed")</strong>
+            @if (!string.IsNullOrEmpty(_test.Result.Message))
+            {
+                <text>: @_test.Result.Message</text>
+            }
+            @if (!_test.ConditionsMatchSample)
+            {
+                <div class="small">The example event does not match the conditions; real events like it would be skipped.</div>
+            }
+        </div>
+    }
+
+    <div class="form-actions">
+        <a class="btn btn-quiet" href="integrations">Cancel</a>
+        <button type="button" class="btn btn-quiet" disabled="@_testing" @onclick="Test">
+            @(_testing ? "Testing…" : "Test")
+        </button>
+        <button type="submit" class="btn btn-primary">@(Id.HasValue ? "Save" : "Create integration")</button>
+    </div>
+</form>
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private sealed class ConditionRow
+    {
+        public string Field { get; set; } = string.Empty;
+        public string Operator { get; set; } = ConditionOperator.Is;
+        public string Value { get; set; }
+    }
+
+    private string _name;
+    private string _description;
+    private bool _enabled = true;
+    private string _triggerType = string.Empty;
+    private readonly List<ConditionRow> _conditions = new();
+    private string _actionType = string.Empty;
+    private JsonObject _config = new();
+    private IReadOnlyDictionary<string, string> _hints = new Dictionary<string, string>();
+    private RetryMode _retryMode = RetryMode.None;
+    private int _maxRetries = 3;
+    private IntegrationDefinition _stored;
+    private bool _notFound;
+    private string _error;
+    private IntegrationTestResult _test;
+    private bool _testing;
+
+    private SrsEventType Trigger => SrsEventTypes.Find(_triggerType);
+    private IIntegrationAction Action => Integrations.FindAction(_actionType);
+    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+
+    private Dictionary<string, object> EditorParameters => new()
+    {
+        [nameof(IntegrationActionEditor.Config)] = _config,
+        [nameof(IntegrationActionEditor.SecretHints)] = _hints,
+        [nameof(IntegrationActionEditor.Trigger)] = Trigger,
+        [nameof(IntegrationActionEditor.ConfigChanged)] = EventCallback.Factory.Create(this, () => _test = null)
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (!Id.HasValue)
+        {
+            if (Integrations.Actions.Count == 1)
+            {
+                _actionType = Integrations.Actions[0].Type;
+            }
+
+            return;
+        }
+
+        _stored = Integrations.Store.Get(Id.Value);
+        if (_stored == null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _name = _stored.Name;
+        _description = _stored.Description;
+        _enabled = _stored.Enabled;
+        _triggerType = _stored.TriggerType;
+        _conditions.Clear();
+        _conditions.AddRange(_stored.Conditions.Select(c => new ConditionRow
+        {
+            Field = c.Field, Operator = c.Operator, Value = c.Value
+        }));
+        _actionType = _stored.ActionType;
+        _config = (JsonObject)_stored.ActionConfig.DeepClone();
+        _hints = _stored.SecretHints;
+        _retryMode = _stored.RetryMode;
+        _maxRetries = _stored.RetryMode == RetryMode.None ? 3 : _stored.MaxRetries;
+    }
+
+    private void TriggerChanged()
+    {
+        var fields = EventData.Fields(Trigger).Select(f => f.Path).ToHashSet();
+        foreach (var condition in _conditions.Where(c => !fields.Contains(c.Field)))
+        {
+            condition.Field = string.Empty;
+        }
+
+        _test = null;
+    }
+
+    private void ActionChanged()
+    {
+        if (_stored != null && _stored.ActionType == _actionType)
+        {
+            _config = (JsonObject)_stored.ActionConfig.DeepClone();
+            _hints = _stored.SecretHints;
+        }
+        else
+        {
+            _config = new JsonObject();
+            _hints = new Dictionary<string, string>();
+        }
+
+        _test = null;
+    }
+
+    private IntegrationDefinition Draft() => new()
+    {
+        Id = Id ?? 0,
+        Name = _name?.Trim(),
+        Description = _description,
+        Enabled = _enabled,
+        TriggerType = _triggerType,
+        Conditions = _conditions
+            .Where(c => !string.IsNullOrWhiteSpace(c.Field))
+            .Select(c => new IntegrationCondition(c.Field, c.Operator,
+                ConditionOperator.NeedsValue(c.Operator) ? c.Value?.Trim() : null))
+            .ToList(),
+        ActionType = _actionType,
+        ActionConfig = (JsonObject)_config.DeepClone(),
+        RetryMode = _retryMode,
+        MaxRetries = _retryMode == RetryMode.None ? 0 : _maxRetries
+    };
+
+    private void Save()
+    {
+        _test = null;
+        _error = Integrations.Save(Draft(), Actor, out _);
+        if (_error == null)
+        {
+            Navigation.NavigateTo("integrations");
+        }
+    }
+
+    private async Task Test()
+    {
+        _error = null;
+        _test = null;
+        _testing = true;
+        try
+        {
+            _test = await Integrations.TestAsync(Draft(), System.Threading.CancellationToken.None);
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+}

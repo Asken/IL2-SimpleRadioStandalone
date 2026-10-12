@@ -1,6 +1,7 @@
 @page "/settings"
 @attribute [Authorize]
 @inherits LiveComponent
+@inject IEnumerable<AdminSettingsSection> ExtraSections
 
 <PageTitle>Settings · IL2-SRS Server</PageTitle>
 
@@ -79,6 +80,11 @@
             }
         </div>
     </section>
+}
+
+@foreach (var section in ExtraSections)
+{
+    <DynamicComponent Type="section.Component" />
 }
 
 @code {

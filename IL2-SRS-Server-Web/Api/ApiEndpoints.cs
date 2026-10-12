@@ -141,6 +141,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
                     Results.Ok(new { deleted = audit.Clear(Actor(user)) })))
                 .WithSummary("Clear the event log");
 
+            IntegrationEndpoints.Map(api);
+
             // Server lifecycle
             Write(api.MapPost("/server/start", (ServerAdminService admin, ClaimsPrincipal user) =>
                     Lifecycle(admin, admin.Start(Actor(user)))))

@@ -1,0 +1,393 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
+using System.Threading.Tasks;
+using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
+using Microsoft.AspNetCore.DataProtection;
+using Xunit;
+
+namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
+{
+    /// <summary>An action that records what it was asked to do and answers with a scripted result.</summary>
+    internal sealed class RecordingAction : IIntegrationAction
+    {
+        public const string ActionType = "recording";
+
+        public ConcurrentQueue<IntegrationExecutionContext> Runs { get; } = new();
+        public Queue<IntegrationResult> Results { get; } = new();
+
+        public string Type => ActionType;
+        public string Label => "Recording";
+        public string Description => "Records runs for tests.";
+        public Type ConfigEditor => typeof(Microsoft.AspNetCore.Components.ComponentBase);
+        public IReadOnlyCollection<string> SecretFields { get; } = new[] { "token" };
+
+        public string Validate(JsonObject config) =>
+            config["token"] is null ? "Enter a token." : null;
+
+        public Task<IntegrationResult> ExecuteAsync(IntegrationExecutionContext context, CancellationToken cancellationToken)
+        {
+            Runs.Enqueue(context);
+            lock (Results)
+            {
+                return Task.FromResult(Results.Count > 0 ? Results.Dequeue() : IntegrationResult.Success("recorded"));
+            }
+        }
+    }
+
+    public class EventDataTests
+    {
+        private static readonly JsonElement Data = EventData.From(SrsEvent.Create(SrsEventTypes.ClientConnected,
+            "system", "Hartmann (Red) connected", EventPayload.Client(
+                new SRClient { ClientGuid = "g", Name = "Hartmann", Coalition = 1 }, "203.0.113.7")));
+
+        [Theory]
+        [InlineData("client.coalitionName", ConditionOperator.Is, "red", true)]
+        [InlineData("client.coalitionName", ConditionOperator.IsNot, "Red", false)]
+        [InlineData("client.name", ConditionOperator.Contains, "MANN", true)]
+        [InlineData("client.name", ConditionOperator.NotContains, "mann", false)]
+        [InlineData("client.coalition", ConditionOperator.GreaterThan, "0", true)]
+        [InlineData("client.coalition", ConditionOperator.LessThan, "1", false)]
+        [InlineData("client.coalition", ConditionOperator.Is, "1.0", true)]
+        [InlineData("client.coalitionName", ConditionOperator.In, "Blue, Red", true)]
+        [InlineData("client.callsign", ConditionOperator.Exists, null, false)]
+        [InlineData("client.callsign", ConditionOperator.NotExists, null, true)]
+        [InlineData("client.callsign", ConditionOperator.Is, "", true)]
+        [InlineData("event.type", ConditionOperator.Is, "client.connected", true)]
+        [InlineData("event.actor", ConditionOperator.Is, "system", true)]
+        [InlineData("client.missing.deeper", ConditionOperator.Is, "x", false)]
+        public void EvaluatesConditions(string field, string op, string value, bool expected)
+        {
+            Assert.Equal(expected, EventData.Matches(Data, new IntegrationCondition(field, op, value)));
+        }
+
+        [Fact]
+        public void AllConditionsMustMatchAndEmptyRowsAreIgnored()
+        {
+            var conditions = new[]
+            {
+                new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Red"),
+                new IntegrationCondition("", ConditionOperator.Is, "ignored"),
+                new IntegrationCondition("client.name", ConditionOperator.Is, "Rall")
+            };
+
+            Assert.False(EventData.Matches(Data, conditions));
+            Assert.True(EventData.Matches(Data, conditions.Take(2)));
+        }
+
+        [Fact]
+        public void SampleDataCoversEveryDocumentedField()
+        {
+            foreach (var type in SrsEventTypes.All)
+            {
+                var sample = EventData.Sample(type);
+                Assert.All(EventData.Fields(type), field => Assert.NotNull(EventData.Resolve(sample, field.Path)));
+                Assert.Equal(type.Type, EventData.AsText(EventData.Resolve(sample, "event.type")));
+            }
+        }
+    }
+
+    public class IntegrationStoreTests
+    {
+        [Fact]
+        public void EncryptsSecretsAndOnlyDecryptsThemToRun()
+        {
+            using var temp = new TempDirectory();
+            var (store, database) = CreateStore(temp);
+
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "super-secret-token-0Jdl", ["room"] = "ops" }));
+
+            Assert.Null(saved.ActionConfig["token"]);
+            Assert.Equal("ops", saved.ActionConfig["room"]!.GetValue<string>());
+            Assert.Equal("ends in 0Jdl", saved.SecretHints["token"]);
+            Assert.Equal("super-secret-token-0Jdl", store.GetForExecution(saved.Id).ActionConfig["token"]!.GetValue<string>());
+            Assert.DoesNotContain("super-secret-token", ReadShared(database.DatabasePath + "-wal") +
+                                                         ReadShared(database.DatabasePath));
+        }
+
+        [Fact]
+        public void KeepsAStoredSecretWhenSavedEmptyAndDropsItWhenTheActionChanges()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "first-secret-value" }));
+
+            var renamed = store.Save(Integration(new JsonObject { ["token"] = null }, saved.Id, "Renamed"));
+            Assert.Equal("Renamed", renamed.Name);
+            Assert.Equal("first-secret-value", store.GetForExecution(saved.Id).ActionConfig["token"]!.GetValue<string>());
+
+            var replaced = store.Save(Integration(new JsonObject { ["token"] = "second-secret-value" }, saved.Id));
+            Assert.Equal("second-secret-value", store.GetForExecution(replaced.Id).ActionConfig["token"]!.GetValue<string>());
+
+            var moved = store.Save(new IntegrationDefinition
+            {
+                Id = saved.Id, Name = "Other", TriggerType = "client.connected", ActionType = "other",
+                ActionConfig = new JsonObject()
+            });
+            Assert.Empty(moved.SecretHints);
+        }
+
+        [Fact]
+        public void DeletingAnIntegrationSkipsItsQueuedRunsAndKeepsHistory()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "secret-value-1234" }));
+            var queued = store.Enqueue(saved, "client.connected", "connected", EventData.Sample(SrsEventTypes.ClientConnected));
+
+            Assert.True(store.Delete(saved.Id));
+
+            Assert.Null(store.Get(saved.Id));
+            var run = store.GetExecution(queued);
+            Assert.Equal(ExecutionStatus.Skipped, run.Status);
+            Assert.Equal("Integration deleted", run.LastError);
+        }
+
+        [Fact]
+        public void RetentionOnlyRemovesFinishedRuns()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "secret-value-1234" }));
+            var data = EventData.Sample(SrsEventTypes.ClientConnected);
+            var finished = store.Enqueue(saved, "client.connected", null, data);
+            store.Finish(finished, ExecutionStatus.Succeeded, null, "ok", null);
+            var queued = store.Enqueue(saved, "client.connected", null, data);
+
+            store.ApplyRetention(DateTime.UtcNow.AddDays(31), 30, 1000);
+
+            Assert.Null(store.GetExecution(finished));
+            Assert.NotNull(store.GetExecution(queued));
+        }
+
+        private static string ReadShared(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return string.Empty;
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream, System.Text.Encoding.Latin1);
+            return reader.ReadToEnd();
+        }
+
+        internal static (IntegrationStore, SrsDatabase) CreateStore(TempDirectory temp)
+        {
+            var database = temp.CreateDatabase();
+            var protector = new SecretProtector(new EphemeralDataProtectionProvider());
+            return (new IntegrationStore(database, protector, new IIntegrationAction[] { new RecordingAction() }), database);
+        }
+
+        internal static IntegrationDefinition Integration(JsonObject config, long id = 0, string name = "Test",
+            string trigger = "client.connected", params IntegrationCondition[] conditions)
+        {
+            return new IntegrationDefinition
+            {
+                Id = id,
+                Name = name,
+                TriggerType = trigger,
+                Conditions = conditions,
+                ActionType = RecordingAction.ActionType,
+                ActionConfig = config
+            };
+        }
+    }
+
+    public class IntegrationServiceTests
+    {
+        [Fact]
+        public void ValidatesBeforeSavingAndRecordsChanges()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, _) = Create(temp);
+            var published = new List<SrsEvent>();
+            events.EventPublished += published.Add;
+
+            Assert.Equal("Enter a name.", service.Save(IntegrationStoreTests.Integration(new JsonObject(), name: " "), "admin", out _));
+            Assert.Equal("Choose a trigger event.",
+                service.Save(IntegrationStoreTests.Integration(new JsonObject(), trigger: "nope"), "admin", out _));
+            Assert.Equal("Enter a token.", service.Save(IntegrationStoreTests.Integration(new JsonObject()), "admin", out _));
+
+            Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "a-secret-token" }),
+                "admin", out var saved));
+            // The stored token satisfies validation when the form leaves it empty.
+            Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject(), saved.Id), "admin", out _));
+            Assert.True(service.SetEnabled(saved.Id, false, "admin"));
+            Assert.True(service.Delete(saved.Id, "admin"));
+
+            Assert.Equal(new[]
+            {
+                "admin.integration_created", "admin.integration_updated", "admin.integration_updated",
+                "admin.integration_deleted"
+            }, published.Select(e => e.Type));
+            Assert.False(published[2].Payload.GetProperty("integration").GetProperty("enabled").GetBoolean());
+        }
+
+        [Fact]
+        public async Task TestRunsTheActionWithSampleDataAndTheStoredSecret()
+        {
+            using var temp = new TempDirectory();
+            var (service, _, action) = Create(temp);
+            service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "stored-secret-value" }), "admin",
+                out var saved);
+
+            var draft = IntegrationStoreTests.Integration(new JsonObject(), saved.Id, conditions: new[]
+            {
+                new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Blue")
+            });
+            var test = await service.TestAsync(draft, CancellationToken.None);
+
+            Assert.True(test.Result.IsSuccess);
+            Assert.False(test.ConditionsMatchSample);
+            Assert.True(action.Runs.TryDequeue(out var run));
+            Assert.True(run.IsTest);
+            Assert.Equal("stored-secret-value", run.Config["token"]!.GetValue<string>());
+            Assert.Equal("Hartmann", EventData.AsText(EventData.Resolve(run.Data, "client.name")));
+            Assert.Empty(service.Store.QueryExecutions());
+        }
+
+        internal static (IntegrationService, ServerEvents, RecordingAction) Create(TempDirectory temp)
+        {
+            var action = new RecordingAction();
+            var store = new IntegrationStore(temp.CreateDatabase(), new SecretProtector(new EphemeralDataProtectionProvider()),
+                new IIntegrationAction[] { action });
+            var events = new ServerEvents();
+            return (new IntegrationService(store, events, new IIntegrationAction[] { action }), events, action);
+        }
+    }
+
+    public class IntegrationDispatcherTests
+    {
+        [Fact]
+        public void QueuesRunsForEnabledIntegrationsWhoseConditionsMatch()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            Save(service, "Red joins", new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Red"));
+            Save(service, "Blue joins", new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Blue"));
+            var disabled = Save(service, "Disabled");
+            service.SetEnabled(disabled.Id, false, "admin");
+
+            dispatcher.Match(Connected(coalition: 1));
+            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStarted, "system", "started"));
+
+            var run = Assert.Single(service.Store.QueryExecutions());
+            Assert.Equal("Red joins", run.IntegrationName);
+            Assert.Equal(ExecutionStatus.Queued, run.Status);
+            Assert.Equal("Hartmann", EventData.AsText(EventData.Resolve(JsonDocument.Parse(run.Data).RootElement, "client.name")));
+        }
+
+        [Fact]
+        public async Task RetriesTemporaryFailuresUntilMaxRetriesThenFails()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            var integration = Save(service, "Flaky", retryMode: RetryMode.Exponential, maxRetries: 1);
+            action.Results.Enqueue(IntegrationResult.Retry("Service unavailable"));
+            action.Results.Enqueue(IntegrationResult.Retry("Still unavailable", TimeSpan.FromMinutes(5)));
+            dispatcher.Match(Connected());
+
+            var first = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Queued, first.Status);
+            Assert.Equal(1, first.Attempts);
+            Assert.Equal("Service unavailable", first.LastError);
+            Assert.InRange(first.NextAttemptAtUtc!.Value - DateTime.UtcNow, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(11));
+
+            var second = await RunNext(service, dispatcher, force: true);
+            Assert.Equal(ExecutionStatus.Failed, second.Status);
+            Assert.Equal(2, second.Attempts);
+            Assert.Equal("Still unavailable", second.LastError);
+            Assert.Equal(new[] { 1, 2 }, action.Runs.Select(r => r.Attempt));
+            Assert.All(action.Runs, r => Assert.Equal(integration.Id, r.Integration.Id));
+        }
+
+        [Fact]
+        public async Task RecordsSuccessAndPermanentFailureAndSkipsDisabledIntegrations()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            var integration = Save(service, "Joins", retryMode: RetryMode.Fixed, maxRetries: 3);
+
+            dispatcher.Match(Connected());
+            var succeeded = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Succeeded, succeeded.Status);
+            Assert.Equal("recorded", succeeded.Result);
+            Assert.NotNull(succeeded.FinishedAtUtc);
+
+            action.Results.Enqueue(IntegrationResult.Fail("Webhook deleted"));
+            dispatcher.Match(Connected());
+            var failed = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Failed, failed.Status);
+            Assert.Equal(1, failed.Attempts);
+
+            dispatcher.Match(Connected());
+            service.SetEnabled(integration.Id, false, "admin");
+            var skipped = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Skipped, skipped.Status);
+            Assert.Equal(2, action.Runs.Count);
+        }
+
+        [Fact]
+        public void RunsLeftRunningAreQueuedAgainAtStartup()
+        {
+            using var temp = new TempDirectory();
+            var (service, _, _) = IntegrationServiceTests.Create(temp);
+            var integration = Save(service, "Joins");
+            var id = service.Store.Enqueue(integration, "client.connected", null, EventData.Sample(SrsEventTypes.ClientConnected));
+            Assert.True(service.Store.TryStart(id));
+            Assert.False(service.Store.TryStart(id));
+
+            Assert.Equal(1, service.Store.ResetRunning());
+            Assert.Equal(ExecutionStatus.Queued, service.Store.GetExecution(id).Status);
+        }
+
+        private static IntegrationDefinition Save(IntegrationService service, string name,
+            IntegrationCondition condition = null, RetryMode retryMode = RetryMode.None, int maxRetries = 0)
+        {
+            var error = service.Save(new IntegrationDefinition
+            {
+                Name = name,
+                TriggerType = "client.connected",
+                Conditions = condition == null ? Array.Empty<IntegrationCondition>() : new[] { condition },
+                ActionType = RecordingAction.ActionType,
+                ActionConfig = new JsonObject { ["token"] = "a-secret-token" },
+                RetryMode = retryMode,
+                MaxRetries = maxRetries
+            }, "admin", out var saved);
+            Assert.Null(error);
+            return saved;
+        }
+
+        private static async Task<IntegrationExecution> RunNext(IntegrationService service, IntegrationDispatcher dispatcher,
+            bool force = false)
+        {
+            var due = service.Store.Due(force ? DateTime.UtcNow.AddHours(1) : DateTime.UtcNow, 1).Single();
+            Assert.True(service.Store.TryStart(due.Id));
+            await dispatcher.RunAsync(due, CancellationToken.None);
+            return service.Store.GetExecution(due.Id);
+        }
+
+        private static SrsEvent Connected(int coalition = 1)
+        {
+            return SrsEvent.Create(SrsEventTypes.ClientConnected, "system", "Hartmann connected",
+                EventPayload.Client(new SRClient { ClientGuid = "g", Name = "Hartmann", Coalition = coalition }));
+        }
+    }
+}

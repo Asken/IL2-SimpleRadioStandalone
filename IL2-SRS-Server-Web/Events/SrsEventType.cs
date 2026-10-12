@@ -4,8 +4,11 @@ using System.Linq;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 {
-    /// <summary>A field in an event payload, addressed by a dotted path such as <c>client.name</c>.</summary>
-    public sealed record SrsEventField(string Path, string Type, string Description);
+    /// <summary>
+    /// A field in an event payload, addressed by a dotted path such as <c>client.name</c>. The example value
+    /// is used for test runs and template previews.
+    /// </summary>
+    public sealed record SrsEventField(string Path, string Type, string Description, object Example = null);
 
     /// <summary>
     /// One kind of event the server publishes: its type name (e.g. <c>client.connected</c>), the event log
@@ -37,42 +40,62 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
     {
         private static readonly SrsEventField[] ClientFields =
         {
-            new("client.guid", "string", "SRS client id"),
-            new("client.name", "string", "Player name"),
-            new("client.coalition", "number", "Coalition: 0 spectators, 1 red, 2 blue"),
-            new("client.coalitionName", "string", "Red, Blue or Spectators"),
-            new("client.callsign", "string", "Assigned callsign, when the pilot roster provides one"),
-            new("client.vehicle", "string", "Assigned aircraft, when the pilot roster provides one"),
-            new("client.airfield", "string", "Assigned airfield, when the pilot roster provides one"),
-            new("client.ip", "string", "Client IP address, when known")
+            new("client.guid", "string", "SRS client id", "kq2DJtj3T0aD4l9oU1Vx3w"),
+            new("client.name", "string", "Player name", "Hartmann"),
+            new("client.coalition", "number", "Coalition: 0 spectators, 1 red, 2 blue", 1),
+            new("client.coalitionName", "string", "Red, Blue or Spectators", "Red"),
+            new("client.callsign", "string", "Assigned callsign, when the pilot roster provides one", "Karaya 1"),
+            new("client.vehicle", "string", "Assigned aircraft, when the pilot roster provides one", "Bf 109 G-6"),
+            new("client.airfield", "string", "Assigned airfield, when the pilot roster provides one", "Kalinovka"),
+            new("client.ip", "string", "Client IP address, when known", "203.0.113.7")
         };
 
         private static readonly SrsEventField[] ServerFields =
         {
-            new("server.port", "number", "SRS port"),
-            new("server.clientCount", "number", "Connected clients")
+            new("server.port", "number", "SRS port", 6002),
+            new("server.clientCount", "number", "Connected clients", 12)
         };
 
         private static readonly SrsEventField[] BanFields =
         {
-            new("ban.id", "number", "Ban id"),
-            new("ban.ip", "string", "Banned IP address"),
-            new("ban.playerName", "string", "Player name recorded with the ban"),
-            new("ban.reason", "string", "Reason given"),
-            new("ban.expiresAt", "string", "Expiry time (UTC, ISO 8601); empty for permanent bans"),
-            new("ban.permanent", "boolean", "True when the ban never expires")
+            new("ban.id", "number", "Ban id", 7),
+            new("ban.ip", "string", "Banned IP address", "203.0.113.7"),
+            new("ban.playerName", "string", "Player name recorded with the ban", "Hartmann"),
+            new("ban.reason", "string", "Reason given", "Team killing"),
+            new("ban.expiresAt", "string", "Expiry time (UTC, ISO 8601); empty for permanent bans",
+                "2026-10-13T18:00:00.0000000Z"),
+            new("ban.permanent", "boolean", "True when the ban never expires", false)
         };
 
         private static readonly SrsEventField[] ApiKeyFields =
         {
-            new("apiKey.name", "string", "Key name"),
-            new("apiKey.scope", "string", "read or write"),
-            new("apiKey.prefix", "string", "Key prefix shown in the admin UI")
+            new("apiKey.name", "string", "Key name", "Discord bot"),
+            new("apiKey.scope", "string", "read or write", "read"),
+            new("apiKey.prefix", "string", "Key prefix shown in the admin UI", "a1b2c3d4")
         };
 
         private static readonly SrsEventField[] RemoteFields =
         {
-            new("ip", "string", "Remote IP address")
+            new("ip", "string", "Remote IP address", "203.0.113.7")
+        };
+
+        private static readonly SrsEventField[] IntegrationFields =
+        {
+            new("integration.id", "number", "Integration id", 3),
+            new("integration.name", "string", "Integration name", "Post joins to Discord"),
+            new("integration.trigger", "string", "Trigger event type", "client.connected"),
+            new("integration.action", "string", "Action type", "discord-webhook")
+        };
+
+        /// <summary>Fields every event has in addition to its payload, for conditions and templates.</summary>
+        public static readonly IReadOnlyList<SrsEventField> CommonFields = new SrsEventField[]
+        {
+            new("event.type", "string", "Event type, e.g. client.connected"),
+            new("event.label", "string", "Event name, e.g. Client connected"),
+            new("event.category", "string", "server, client, radio, admin or auth"),
+            new("event.actor", "string", "Who caused it: system, admin, api:<key name> or anonymous", "system"),
+            new("event.message", "string", "The event log message"),
+            new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z")
         };
 
         public static readonly SrsEventType ServerStarted = new("server.started", EventCategory.Server,
@@ -84,7 +107,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 
         public static readonly SrsEventType ServerStartFailed = new("server.start_failed", EventCategory.Server,
             "Server failed to start", "Starting the SRS server failed, for example because the port is in use.",
-            ServerFields, new SrsEventField[] { new("error", "string", "Error message") });
+            ServerFields, new SrsEventField[] { new("error", "string", "Error message", "Port 6002 is already in use") });
 
         public static readonly SrsEventType ClientConnected = new("client.connected", EventCategory.Client,
             "Client connected", "A client completed the SRS handshake.", ClientFields);
@@ -94,18 +117,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 
         public static readonly SrsEventType ClientRejected = new("client.rejected", EventCategory.Client,
             "Connection refused", "A connection was refused: banned address, unsupported version or not an SRS client.",
-            RemoteFields, new SrsEventField[] { new("reason", "string", "Why the connection was refused") });
+            RemoteFields, new SrsEventField[] { new("reason", "string", "Why the connection was refused", "banned") });
 
         public static readonly SrsEventType ClientNameChanged = new("client.name_changed", EventCategory.Client,
             "Client renamed", "A connected client changed player name.",
-            ClientFields, new SrsEventField[] { new("previousName", "string", "Name before the change") });
+            ClientFields, new SrsEventField[] { new("previousName", "string", "Name before the change", "Hartmann (2)") });
 
         public static readonly SrsEventType ClientCoalitionChanged = new("client.coalition_changed",
             EventCategory.Client, "Coalition changed", "A connected client switched coalition.",
             ClientFields, new SrsEventField[]
             {
-                new("previousCoalition", "number", "Coalition before the change"),
-                new("previousCoalitionName", "string", "Red, Blue or Spectators")
+                new("previousCoalition", "number", "Coalition before the change", 0),
+                new("previousCoalitionName", "string", "Red, Blue or Spectators", "Spectators")
             });
 
         public static readonly SrsEventType RadioFrequencyChanged = new("radio.frequency_changed",
@@ -114,14 +137,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             "has settled for two seconds, so turning the dial produces one event.",
             ClientFields, new SrsEventField[]
             {
-                new("radio.index", "number", "Radio number (1 or 2)"),
-                new("radio.enabled", "boolean", "False when the radio was turned off"),
-                new("radio.channel", "number", "Channel, when on an AM channel"),
-                new("radio.channelName", "string", "Channel name from Channel Names, when set"),
-                new("radio.frequencyMhz", "number", "Frequency in MHz; empty when turned off"),
-                new("radio.modulation", "string", "AM or FM"),
-                new("radio.previousChannel", "number", "Channel before the change"),
-                new("radio.previousFrequencyMhz", "number", "Frequency before the change; empty when it was off")
+                new("radio.index", "number", "Radio number (1 or 2)", 1),
+                new("radio.enabled", "boolean", "False when the radio was turned off", true),
+                new("radio.channel", "number", "Channel, when on an AM channel", 4),
+                new("radio.channelName", "string", "Channel name from Channel Names, when set", "Tower"),
+                new("radio.frequencyMhz", "number", "Frequency in MHz; empty when turned off", 254.0),
+                new("radio.modulation", "string", "AM or FM", "AM"),
+                new("radio.previousChannel", "number", "Channel before the change", 1),
+                new("radio.previousFrequencyMhz", "number", "Frequency before the change; empty when it was off", 251.0)
             });
 
         public static readonly SrsEventType ClientKicked = new("admin.client_kicked", EventCategory.Admin,
@@ -132,7 +155,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 
         public static readonly SrsEventType AddressBanned = new("admin.ip_banned", EventCategory.Admin,
             "IP address banned", "An admin banned an IP address directly.",
-            BanFields, new SrsEventField[] { new("disconnectedClients", "number", "Clients disconnected by the ban") });
+            BanFields, new SrsEventField[] { new("disconnectedClients", "number", "Clients disconnected by the ban", 1) });
 
         public static readonly SrsEventType BanRemoved = new("admin.ban_removed", EventCategory.Admin,
             "Ban removed", "An admin removed a ban.", BanFields);
@@ -147,17 +170,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             "Setting changed", "An admin changed a server setting. Values of secret settings are left out.",
             new SrsEventField[]
             {
-                new("setting.key", "string", "Setting key, e.g. COALITION_AUDIO_SECURITY"),
-                new("setting.label", "string", "Setting name shown in the admin UI"),
-                new("setting.previousValue", "string", "Value before the change; empty for secrets"),
-                new("setting.value", "string", "New value; empty for secrets"),
-                new("setting.secret", "boolean", "True for secret settings such as passwords"),
-                new("setting.requiresRestart", "boolean", "True when the change applies after a restart")
+                new("setting.key", "string", "Setting key, e.g. COALITION_AUDIO_SECURITY", "COALITION_AUDIO_SECURITY"),
+                new("setting.label", "string", "Setting name shown in the admin UI", "Coalition security"),
+                new("setting.previousValue", "string", "Value before the change; empty for secrets", "false"),
+                new("setting.value", "string", "New value; empty for secrets", "true"),
+                new("setting.secret", "boolean", "True for secret settings such as passwords", false),
+                new("setting.requiresRestart", "boolean", "True when the change applies after a restart", false)
             });
 
         public static readonly SrsEventType ChannelNamesChanged = new("admin.channel_names_changed",
             EventCategory.Admin, "Channel names changed", "An admin updated the channel names.",
-            new SrsEventField[] { new("namedChannels", "number", "Channels that have a name") });
+            new SrsEventField[] { new("namedChannels", "number", "Channels that have a name", 6) });
 
         public static readonly SrsEventType ApiKeyCreated = new("admin.api_key_created", EventCategory.Admin,
             "API key created", "An admin created an API key.", ApiKeyFields);
@@ -167,7 +190,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 
         public static readonly SrsEventType EventLogCleared = new("admin.event_log_cleared", EventCategory.Admin,
             "Event log cleared", "An admin deleted all stored events.",
-            new SrsEventField[] { new("deleted", "number", "Events deleted") });
+            new SrsEventField[] { new("deleted", "number", "Events deleted", 1520) });
+
+        public static readonly SrsEventType IntegrationCreated = new("admin.integration_created", EventCategory.Admin,
+            "Integration created", "An admin created an integration.", IntegrationFields);
+
+        public static readonly SrsEventType IntegrationUpdated = new("admin.integration_updated", EventCategory.Admin,
+            "Integration changed", "An admin changed, enabled or disabled an integration.", IntegrationFields,
+            new SrsEventField[] { new("integration.enabled", "boolean", "Whether the integration is enabled", true) });
+
+        public static readonly SrsEventType IntegrationDeleted = new("admin.integration_deleted", EventCategory.Admin,
+            "Integration deleted", "An admin deleted an integration.", IntegrationFields);
 
         public static readonly SrsEventType AdminLogin = new("auth.login", EventCategory.Auth,
             "Admin login", "Someone logged in to the admin UI.", RemoteFields);
@@ -185,6 +218,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             RadioFrequencyChanged,
             ClientKicked, ClientBanned, AddressBanned, BanRemoved, ClientMuted, ClientUnmuted, SettingChanged,
             ChannelNamesChanged, ApiKeyCreated, ApiKeyRevoked, EventLogCleared,
+            IntegrationCreated, IntegrationUpdated, IntegrationDeleted,
             AdminLogin, AdminLoginFailed, AdminLogout
         };
 
