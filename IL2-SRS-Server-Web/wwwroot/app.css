@@ -315,7 +315,7 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 .pill { display: inline-block; padding: .05rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
 .pill-ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .pill-wait { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
-.pill-bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.pill-bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--error-text); }
 .pill-quiet { background: var(--surface-2); color: var(--muted); }
 .tx-live { color: var(--ok); font-weight: 600; }
 
@@ -658,7 +658,7 @@ input[aria-invalid="true"]:focus-visible, select[aria-invalid="true"]:focus-visi
 :root[data-theme="srs"] .pill { border-radius: 3px; font-family: var(--mono); font-weight: 400; text-transform: uppercase; letter-spacing: .05em; }
 :root[data-theme="srs"] .pill-ok { background: #1c3a1f; border: 1px solid #2f6b33; text-shadow: 0 0 5px color-mix(in srgb, var(--ok) 50%, transparent); }
 :root[data-theme="srs"] .pill-wait { background: #3a321c; border: 1px solid #6b5a2f; }
-:root[data-theme="srs"] .pill-bad { background: #3a1f1c; border: 1px solid #6b332f; color: #e08a7e; }
+:root[data-theme="srs"] .pill-bad { background: #3a1f1c; border: 1px solid #6b332f; }
 :root[data-theme="srs"] .pill-quiet { background: var(--well); border: 1px solid var(--rim); }
 :root[data-theme="srs"] .field textarea,
 :root[data-theme="srs"] .action-config textarea {
