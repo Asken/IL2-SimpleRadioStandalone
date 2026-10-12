@@ -167,6 +167,26 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public void KeepsActionStateUntilTheIntegrationIsDeleted()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "t" }));
+            var other = store.Save(Integration(new JsonObject { ["token"] = "t" }, name: "Other"));
+
+            store.State(saved.Id).Set("message", "111");
+            store.State(saved.Id).Set("message", "222");
+            store.State(other.Id).Set("message", "333");
+            Assert.Equal("222", store.State(saved.Id).Get("message"));
+
+            store.State(other.Id).Remove("message");
+            Assert.Null(store.State(other.Id).Get("message"));
+
+            Assert.True(store.Delete(saved.Id));
+            Assert.Null(store.State(saved.Id).Get("message"));
+        }
+
+        [Fact]
         public void RetentionOnlyRemovesFinishedRuns()
         {
             using var temp = new TempDirectory();
@@ -415,6 +435,23 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Equal("Still unavailable", second.LastError);
             Assert.Equal(new[] { 1, 2 }, action.Runs.Select(r => r.Attempt));
             Assert.All(action.Runs, r => Assert.Equal(integration.Id, r.Integration.Id));
+        }
+
+        [Fact]
+        public async Task RunsKeepTheirIntegrationsStateInTheDatabase()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            var integration = Save(service, "Status");
+            dispatcher.Match(Connected());
+
+            await RunNext(service, dispatcher);
+            Assert.True(action.Runs.TryDequeue(out var run));
+            run.State.Set("discord.message.abc", "111");
+
+            Assert.Equal("111", service.Store.State(integration.Id).Get("discord.message.abc"));
         }
 
         [Fact]

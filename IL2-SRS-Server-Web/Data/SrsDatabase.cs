@@ -109,7 +109,16 @@ CREATE TABLE IF NOT EXISTS integration_executions (
     result           TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_integration_executions_due ON integration_executions (status, next_attempt_at);
-CREATE INDEX IF NOT EXISTS ix_integration_executions_integration ON integration_executions (integration_id);"
+CREATE INDEX IF NOT EXISTS ix_integration_executions_integration ON integration_executions (integration_id);",
+            // 5: values an action keeps for its integration between runs (e.g. the Discord message it updates).
+            @"
+CREATE TABLE IF NOT EXISTS integration_state (
+    integration_id INTEGER NOT NULL,
+    key            TEXT NOT NULL,
+    value          TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    PRIMARY KEY (integration_id, key)
+);"
         };
 
         public static int SchemaVersion => Migrations.Length;

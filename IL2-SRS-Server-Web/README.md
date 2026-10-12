@@ -217,6 +217,9 @@ With several trigger events, `event.type` tells them apart:
   and messages never mention anyone (`allowed_mentions` is empty). Use `{{ raw.client.name }}` for a value without
   escaping. Each webhook sends at most 30 messages a minute; more wait their turn, as do messages Discord answers
   with 429, without using up a retry.
+  **Each event: Updates one message** keeps editing the message the first event posted, e.g. a server status
+  pinned in the channel; if it is deleted or the webhook URL changes, the next event posts a new one. **Test**
+  always posts a separate message.
 - **Send an HTTP request**: POST, PUT or PATCH to any URL with optional headers. An empty body sends the event data
   as JSON. With a JSON content type, text values are escaped for use inside quotes
   (`{"text": "{{ event.message }}"}`) and the body must be valid JSON. Any 2xx response is a success; 5xx and

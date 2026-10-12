@@ -25,9 +25,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public const string TitleField = "title";
         public const string ColorField = "color";
         public const string UsernameField = "username";
+        public const string MessageModeField = "messageMode";
 
         public const string StyleText = "text";
         public const string StyleEmbed = "embed";
+
+        /// <summary>Each event posts a new message.</summary>
+        public const string ModePost = "post";
+
+        /// <summary>Each event edits the same message (e.g. a server status), posting a new one if it is gone.</summary>
+        public const string ModeUpdate = "update";
+
+        /// <summary>Integration state key prefix for the message ID, followed by a hash of the webhook URL.</summary>
+        private const string MessageStatePrefix = "discord.message.";
         public const string DefaultContent = "{{ event.message }}";
         public const string DefaultTitle = "{{ event.label }}";
         public const string DefaultColor = "#5865f2";
@@ -78,6 +88,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 errors[StyleField] = "Choose a message style.";
             }
 
+            var mode = config.GetText(MessageModeField) ?? ModePost;
+            if (mode != ModePost && mode != ModeUpdate)
+            {
+                errors[MessageModeField] = "Choose whether to post a new message or keep one message updated.";
+            }
+
             if ((config.GetText(UsernameField)?.Length ?? 0) > MaxUsernameLength)
             {
                 errors[UsernameField] = $"The bot name can be at most {MaxUsernameLength} characters.";
@@ -123,14 +139,60 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     wait.Value);
             }
 
-            using var response = await _http.CreateClient(WebhookHttp.ClientName)
-                .PostAsJsonAsync(WithWait(url), message, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
+            var client = _http.CreateClient(WebhookHttp.ClientName);
+            // Test runs always post: they must not edit (or replace) the message real runs keep updated.
+            var keepUpdated = context.Config.GetText(MessageModeField) == ModeUpdate && !context.IsTest;
+            var stateKey = MessageStatePrefix + Hash(url);
+            if (keepUpdated && context.State.Get(stateKey) is { } messageId)
             {
-                return IntegrationResult.Success("Discord accepted the message.");
+                // Webhook message edits can't change the bot name.
+                var edit = (JsonObject)message.DeepClone();
+                edit.Remove(UsernameField);
+                using var request = new HttpRequestMessage(HttpMethod.Patch, MessageUrl(url, messageId))
+                {
+                    Content = JsonContent.Create(edit)
+                };
+                using var edited = await client.SendAsync(request, cancellationToken);
+                if (edited.IsSuccessStatusCode)
+                {
+                    return IntegrationResult.Success("Updated the Discord message.");
+                }
+
+                if (edited.StatusCode != HttpStatusCode.NotFound)
+                {
+                    return await FailureAsync(edited, cancellationToken);
+                }
+
+                // The message was deleted in Discord: post a new one below and keep that updated instead.
+                context.State.Remove(stateKey);
             }
 
+            using var response = await client.PostAsJsonAsync(WithWait(url), message, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return await FailureAsync(response, cancellationToken);
+            }
+
+            if (!keepUpdated)
+            {
+                return IntegrationResult.Success(context.IsTest && context.Config.GetText(MessageModeField) == ModeUpdate
+                    ? "Discord accepted the test message. Tests post a new message and leave the updated one alone."
+                    : "Discord accepted the message.");
+            }
+
+            if (await MessageIdAsync(response, cancellationToken) is not { } postedId)
+            {
+                return IntegrationResult.Success("Discord accepted the message but didn't return its ID, " +
+                                                  "so the next event posts a new one.");
+            }
+
+            context.State.Set(stateKey, postedId);
+            return IntegrationResult.Success("Posted a new Discord message; the next events update it.");
+        }
+
+        private static async Task<IntegrationResult> FailureAsync(HttpResponseMessage response,
+            CancellationToken cancellationToken)
+        {
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 return IntegrationResult.Defer("Discord asked to slow down.",
@@ -223,6 +285,37 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         {
             var trimmed = url.Trim();
             return trimmed + (trimmed.Contains('?') ? "&" : "?") + "wait=true";
+        }
+
+        /// <summary>The webhook's URL for one of its messages, keeping a query such as ?thread_id=.</summary>
+        internal static string MessageUrl(string url, string messageId)
+        {
+            var builder = new UriBuilder(url.Trim());
+            builder.Path = builder.Path.TrimEnd('/') + "/messages/" + Uri.EscapeDataString(messageId);
+            return builder.Uri.ToString();
+        }
+
+        private static async Task<string> MessageIdAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                return json.RootElement.ValueKind == JsonValueKind.Object &&
+                       json.RootElement.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+                    ? id.GetString()
+                    : null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Identifies the webhook in stored state without storing its secret URL.</summary>
+        private static string Hash(string url)
+        {
+            var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(url.Trim()));
+            return Convert.ToHexString(bytes, 0, 12).ToLowerInvariant();
         }
 
         private static async Task<string> DiscordErrorAsync(HttpResponseMessage response,

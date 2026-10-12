@@ -182,6 +182,33 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>1 for the first attempt.</summary>
         public int Attempt { get; init; } = 1;
 
+        /// <summary>
+        /// Values the action keeps for this integration between runs. A test run gets its own empty state, so it
+        /// never changes what real runs use.
+        /// </summary>
+        public IIntegrationState State { get; init; } = new MemoryIntegrationState();
+
         public bool IsTest => ExecutionId == 0;
+    }
+
+    /// <summary>
+    /// Values an action keeps for its integration between runs, such as the Discord message it keeps updated.
+    /// They are kept until the integration is deleted.
+    /// </summary>
+    public interface IIntegrationState
+    {
+        string Get(string key);
+        void Set(string key, string value);
+        void Remove(string key);
+    }
+
+    /// <summary>State that lasts only as long as the object (test runs).</summary>
+    public sealed class MemoryIntegrationState : IIntegrationState
+    {
+        private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+
+        public string Get(string key) => _values.TryGetValue(key, out var value) ? value : null;
+        public void Set(string key, string value) => _values[key] = value;
+        public void Remove(string key) => _values.Remove(key);
     }
 }

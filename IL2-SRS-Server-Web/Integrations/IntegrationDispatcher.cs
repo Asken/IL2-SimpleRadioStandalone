@@ -231,7 +231,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 Config = integration.ActionConfig,
                 EventType = SrsEventTypes.Find(execution.EventType),
                 Data = data.RootElement,
-                Attempt = attempt
+                Attempt = attempt,
+                State = _store.State(integration.Id)
             };
 
             var result = await IntegrationService.RunAsync(action, context, stoppingToken);

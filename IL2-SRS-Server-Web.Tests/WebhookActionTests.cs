@@ -101,13 +101,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             return (new DiscordWebhookAction(webhook, new WebhookRateLimiter(perMinute, () => DateTime.UtcNow)), webhook);
         }
 
-        private static IntegrationExecutionContext Context(JsonObject config) => new()
+        private static IntegrationExecutionContext Context(JsonObject config, IIntegrationState state = null,
+            long executionId = 1) => new()
         {
-            ExecutionId = 1,
+            ExecutionId = executionId,
             Config = config,
             EventType = SrsEventTypes.ClientConnected,
-            Data = Data
+            Data = Data,
+            State = state ?? new MemoryIntegrationState()
         };
+
+        private static HttpResponseMessage Posted(string id) =>
+            new(HttpStatusCode.OK) { Content = new StringContent($"{{\"id\": \"{id}\", \"content\": \"x\"}}") };
 
         [Fact]
         public void ValidatesTheWebhookUrlAndTemplates()
@@ -211,6 +216,61 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.False(third.CountsAsAttempt);
             Assert.InRange(third.RetryAfter!.Value, TimeSpan.FromSeconds(50), TimeSpan.FromSeconds(60));
             Assert.Equal(2, webhook.Requests.Count);
+        }
+
+        [Fact]
+        public async Task KeepsOneMessageUpdatedAndPostsANewOneWhenItIsGone()
+        {
+            var (action, webhook) = Create();
+            var state = new MemoryIntegrationState();
+            var config = new JsonObject { ["webhookUrl"] = Url, ["messageMode"] = "update", ["username"] = "SRS" };
+
+            webhook.Responses.Enqueue(Posted("111"));
+            var first = await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            Assert.Equal("Posted a new Discord message; the next events update it.", first.Message);
+
+            var second = await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            Assert.Equal("Updated the Discord message.", second.Message);
+            var (edit, editBody) = webhook.Requests[^1];
+            Assert.Equal(HttpMethod.Patch, edit.Method);
+            Assert.Equal(Url + "/messages/111", edit.RequestUri!.ToString());
+            Assert.False(JsonDocument.Parse(editBody).RootElement.TryGetProperty("username", out _));
+
+            // Someone deleted the message in Discord: post a new one and keep that one updated.
+            webhook.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.NotFound));
+            webhook.Responses.Enqueue(Posted("222"));
+            var third = await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            Assert.True(third.IsSuccess, third.Message);
+            Assert.Equal(new[] { HttpMethod.Post, HttpMethod.Patch, HttpMethod.Patch, HttpMethod.Post },
+                webhook.Requests.Select(r => r.Request.Method));
+
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            Assert.Equal(Url + "/messages/222", webhook.Requests[^1].Request.RequestUri!.ToString());
+        }
+
+        [Fact]
+        public async Task TestRunsPostANewMessageAndLeaveTheUpdatedOneAlone()
+        {
+            var (action, webhook) = Create();
+            var state = new MemoryIntegrationState();
+            var config = new JsonObject { ["webhookUrl"] = Url, ["messageMode"] = "update" };
+            webhook.Responses.Enqueue(Posted("111"));
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+
+            webhook.Responses.Enqueue(Posted("999"));
+            var test = await action.ExecuteAsync(Context(config, state, executionId: 0), CancellationToken.None);
+
+            Assert.True(test.IsSuccess);
+            Assert.Equal(HttpMethod.Post, webhook.Requests[^1].Request.Method);
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            Assert.Equal(Url + "/messages/111", webhook.Requests[^1].Request.RequestUri!.ToString());
+        }
+
+        [Fact]
+        public void MessageUrlsKeepTheWebhookQuery()
+        {
+            Assert.Equal("https://discord.com/api/webhooks/1/abc/messages/9?thread_id=5",
+                DiscordWebhookAction.MessageUrl("https://discord.com/api/webhooks/1/abc?thread_id=5", "9"));
         }
 
         [Fact]

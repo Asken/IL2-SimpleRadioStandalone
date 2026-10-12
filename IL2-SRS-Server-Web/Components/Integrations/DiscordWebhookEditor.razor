@@ -15,6 +15,28 @@
     <span class="field-help">In Discord: channel settings → Integrations → Webhooks → Copy Webhook URL. Stored encrypted.</span>
 </div>
 
+<div class="field">
+    <label for="discord-mode">Each event</label>
+    <select id="discord-mode" value="@Mode" @onchange="e => SetString(DiscordWebhookAction.MessageModeField, e.Value?.ToString())">
+        <option value="@DiscordWebhookAction.ModePost">Posts a new message</option>
+        <option value="@DiscordWebhookAction.ModeUpdate">Updates one message</option>
+    </select>
+    <span class="field-help">
+        @if (Mode == DiscordWebhookAction.ModeUpdate)
+        {
+            <text>
+                The first event posts a message and later events edit it, e.g. a server status you pin in the channel.
+                If the message is deleted or the webhook changes, the next event posts a new one.
+                Test always posts a separate message.
+            </text>
+        }
+        else
+        {
+            <text>Every event is a new message in the channel.</text>
+        }
+    </span>
+</div>
+
 <div class="field-grid">
     <div class="field">
         <label for="discord-style">Style</label>
@@ -77,6 +99,7 @@
 
 @code {
     private string Style => GetString(DiscordWebhookAction.StyleField) ?? DiscordWebhookAction.StyleText;
+    private string Mode => GetString(DiscordWebhookAction.MessageModeField) ?? DiscordWebhookAction.ModePost;
 
     private string Preview(JsonElement data)
     {

@@ -142,6 +142,7 @@ SELECT $id;";
                 command.CommandText = @"
 UPDATE integration_executions SET status = 'skipped', finished_at = $now, last_error = 'Integration deleted'
 WHERE integration_id = $id AND status = 'queued';
+DELETE FROM integration_state WHERE integration_id = $id;
 DELETE FROM integrations WHERE id = $id;";
                 command.Parameters.AddWithValue("$id", id);
                 command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
@@ -512,6 +513,50 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
             {
                 return new List<IntegrationCondition>();
             }
+        }
+
+        /// <summary>The state an integration's action keeps between runs (see <see cref="IIntegrationState"/>).</summary>
+        public IIntegrationState State(long integrationId) => new StoredState(this, integrationId);
+
+        internal string GetState(long integrationId, string key)
+        {
+            using var connection = _database.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT value FROM integration_state WHERE integration_id = $id AND key = $key;";
+            command.Parameters.AddWithValue("$id", integrationId);
+            command.Parameters.AddWithValue("$key", key);
+            return command.ExecuteScalar() as string;
+        }
+
+        internal void SetState(long integrationId, string key, string value)
+        {
+            using var connection = _database.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = value == null
+                ? "DELETE FROM integration_state WHERE integration_id = $id AND key = $key;"
+                : @"INSERT INTO integration_state (integration_id, key, value, updated_at) VALUES ($id, $key, $value, $now)
+ON CONFLICT (integration_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;";
+            command.Parameters.AddWithValue("$id", integrationId);
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.AddWithValue("$value", (object)value ?? DBNull.Value);
+            command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+            command.ExecuteNonQuery();
+        }
+
+        private sealed class StoredState : IIntegrationState
+        {
+            private readonly IntegrationStore _store;
+            private readonly long _integrationId;
+
+            public StoredState(IntegrationStore store, long integrationId)
+            {
+                _store = store;
+                _integrationId = integrationId;
+            }
+
+            public string Get(string key) => _store.GetState(_integrationId, key);
+            public void Set(string key, string value) => _store.SetState(_integrationId, key, value);
+            public void Remove(string key) => _store.SetState(_integrationId, key, null);
         }
 
         private static string Truncate(string text)

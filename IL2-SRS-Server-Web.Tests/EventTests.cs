@@ -132,7 +132,7 @@ PRAGMA user_version = " + userVersion + ";";
             foreach (var (table, column) in new[]
                      {
                          ("events", "payload"), ("coalition_channel_names", "name"),
-                         ("integrations", "name"), ("integration_executions", "status")
+                         ("integrations", "name"), ("integration_executions", "status"), ("integration_state", "value")
                      })
             {
                 using var columns = check.CreateCommand();
