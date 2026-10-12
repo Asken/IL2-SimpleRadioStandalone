@@ -53,11 +53,32 @@
 
     // Reconnect popup (#components-reconnect-modal in App.razor): when the server no longer knows this
     // page's session (it restarted), reconnecting cannot succeed, so reload instead of retrying.
+    // blazor.web.js dispatches the event on the popup without bubbling, so listen while it travels down.
     document.addEventListener('components-reconnect-state-changed', function (event) {
         var state = event.detail && event.detail.state;
         if (state === 'rejected' || state === 'resume-failed') {
             location.reload();
         }
+    }, true);
+
+    // Start Blazor (App.razor loads blazor.web.js with autostart="false") retrying a lost connection every
+    // second, then every 5 seconds for 10 minutes, instead of the default that backs off to every 30 seconds:
+    // after a server restart the page notices within seconds and reloads.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.Blazor) {
+            return;
+        }
+
+        window.Blazor.start({
+            circuit: {
+                reconnectionOptions: {
+                    maxRetries: 130,
+                    retryIntervalMilliseconds: function (attempt) {
+                        return attempt < 10 ? 1000 : 5000;
+                    }
+                }
+            }
+        });
     });
 
     // <local-time datetime="2026-10-02T20:22:00Z" format="datetime|seconds|time">: shows a UTC timestamp
