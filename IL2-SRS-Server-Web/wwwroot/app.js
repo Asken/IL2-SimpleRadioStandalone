@@ -1,9 +1,10 @@
 // Loaded in <head> so the theme is applied before first paint and <local-time> is defined before the body renders.
 (function () {
-    // Theme: Desktop (follow the system setting) -> Light -> Dark, remembered per browser.
+    // Theme: Desktop (follow the system setting) -> Light -> Dark -> IL-2 SRS (the client's grey
+    // instrument-panel look), remembered per browser.
     var storageKey = 'il2srs.theme';
-    var themes = ['desktop', 'light', 'dark'];
-    var labels = { desktop: 'Desktop', light: 'Light', dark: 'Dark' };
+    var themes = ['desktop', 'light', 'dark', 'srs'];
+    var labels = { desktop: 'Desktop', light: 'Light', dark: 'Dark', srs: 'IL-2 SRS' };
 
     function readTheme() {
         try {

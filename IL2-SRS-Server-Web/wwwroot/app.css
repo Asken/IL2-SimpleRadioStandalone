@@ -52,6 +52,42 @@
     color-scheme: dark;
 }
 
+/* IL-2 SRS: the client's grey instrument-panel theme (IL2-SR-Client/Themes/MilitaryPaletteGrey.xaml).
+   Equipment styling is in the "IL-2 SRS theme" section at the end of this file. */
+@font-face { font-family: "Allerta Stencil"; src: url("fonts/AllertaStencil-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Share Tech Mono"; src: url("fonts/ShareTechMono-Regular.ttf") format("truetype"); font-display: swap; }
+
+:root[data-theme="srs"] {
+    --bg: #393d3f;
+    --surface: #3d4144;
+    --surface-2: #313538;
+    --border: #51565a;
+    --text: #e4e1d3;
+    --muted: #8e9290;
+    --accent: #ccc6a9;
+    --accent-text: #1f2224;
+    --danger: #c25b4e;
+    --ok: #4fe34f;
+    --warn: #e0b95c;
+    --red: #c25b4e;
+    --blue: #5f8fc2;
+    --grey: #43474a;
+    --radius: 5px;
+    --stencil: "Allerta Stencil", var(--font);
+    --mono: "Share Tech Mono", ui-monospace, Consolas, monospace;
+    --rim: #17191b;
+    --well: #1f2224;
+    --chrome: #2b2e30;
+    --highlight: rgb(255 255 255 / .14);
+    --plate: linear-gradient(#45494c, #34383b);
+    --btn-face: linear-gradient(#4d5256, #303437);
+    --btn-hover: linear-gradient(#5a6064, #3a3e41);
+    --btn-pressed: linear-gradient(#282c2e, #3e4346);
+    --steel-face: linear-gradient(#757c81, #4f555a);
+    --steel-hover: linear-gradient(#828a8f, #585f64);
+    color-scheme: dark;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body {
@@ -63,6 +99,8 @@ html, body {
 
 a { color: var(--accent); }
 h1 { font-size: 1.4rem; margin: 0; }
+/* FocusOnNavigate (Routes.razor) moves focus to the page heading for screen readers; no visible ring. */
+h1:focus { outline: none; }
 h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
 code, .mono { font-family: var(--mono); font-size: .92em; }
 .muted { color: var(--muted); }
@@ -97,7 +135,8 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 :root:not([data-theme-choice]) .theme-label-desktop,
 :root[data-theme-choice="desktop"] .theme-label-desktop,
 :root[data-theme-choice="light"] .theme-label-light,
-:root[data-theme-choice="dark"] .theme-label-dark { display: block; }
+:root[data-theme-choice="dark"] .theme-label-dark,
+:root[data-theme-choice="srs"] .theme-label-srs { display: block; }
 .icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .logout { margin-left: 0; }
 
@@ -389,3 +428,180 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 }
 
 #blazor-error-ui .reload { color: #fff; font-weight: 600; margin-left: .5rem; }
+
+/* IL-2 SRS theme: equipment plates with corner screws, bevelled pushbuttons, inset wells and indicator
+   lamps, after the WPF client's MilitaryControls.xaml. Colours come from the variables set above. */
+:root[data-theme="srs"] {
+    --screw-stops: #c0bcad 0, #8f8d84 1.2px, #5f6266 3.2px, #2c2f31 4.6px, var(--rim) 5px, transparent 5.6px;
+    --screw-slot: linear-gradient(#202325, #202325);
+    /* Four slotted screws, 11px in from each corner; layer them over a plate gradient. */
+    --screws:
+        var(--screw-slot) 7.5px 10.25px / 7px 1.5px no-repeat,
+        var(--screw-slot) right 10.25px top 7.5px / 1.5px 7px no-repeat,
+        var(--screw-slot) left 10.25px bottom 7.5px / 1.5px 7px no-repeat,
+        var(--screw-slot) right 7.5px bottom 10.25px / 7px 1.5px no-repeat,
+        radial-gradient(circle 5.6px at 11px 11px, var(--screw-stops)),
+        radial-gradient(circle 5.6px at calc(100% - 11px) 11px, var(--screw-stops)),
+        radial-gradient(circle 5.6px at 11px calc(100% - 11px), var(--screw-stops)),
+        radial-gradient(circle 5.6px at calc(100% - 11px) calc(100% - 11px), var(--screw-stops));
+    scrollbar-color: #5a6064 var(--chrome);
+}
+
+:root[data-theme="srs"] body { min-height: 100vh; background: radial-gradient(ellipse at top, #42474a, #2c2f31); }
+:root[data-theme="srs"] h1 { font-family: var(--stencil); font-weight: 400; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Equipment plates */
+:root[data-theme="srs"] .panel,
+:root[data-theme="srs"] .tile,
+:root[data-theme="srs"] .login-card,
+:root[data-theme="srs"] .reconnect-card {
+    background: var(--screws), var(--plate);
+    border: 1px solid var(--rim);
+    box-shadow: inset 1px 1px 0 var(--highlight), 0 2px 6px rgb(0 0 0 / .35);
+}
+
+:root[data-theme="srs"] .panel { padding: 1rem 1.75rem 1.1rem; }
+:root[data-theme="srs"] .login-card { padding: 1.75rem; }
+
+/* Panel captions: stencil lettering followed by an engraved rule, like the client's group boxes. */
+:root[data-theme="srs"] .panel h2 {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font: 400 1rem var(--stencil);
+    color: var(--accent);
+    text-shadow: 0 1px 0 #000;
+}
+
+:root[data-theme="srs"] .panel h2::after {
+    content: "";
+    flex: 1;
+    height: 2px;
+    border-top: 1px solid var(--rim);
+    border-bottom: 1px solid var(--highlight);
+}
+
+:root[data-theme="srs"] .panel-head h2 { flex: 1; }
+
+/* Window chrome: title bar and tab-style navigation with indicator lamps. */
+:root[data-theme="srs"] .topbar { background: var(--chrome); border-bottom: 1px solid var(--rim); box-shadow: 0 1px 0 var(--highlight); }
+:root[data-theme="srs"] .brand { font: 400 1.05rem var(--stencil); text-transform: uppercase; letter-spacing: .03em; }
+:root[data-theme="srs"] .topbar-meta { font-family: var(--mono); }
+:root[data-theme="srs"] .sidenav { gap: 4px; border-right-color: var(--rim); background: rgb(0 0 0 / .12); }
+
+:root[data-theme="srs"] .sidenav a {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    border: 1px solid var(--rim);
+    border-radius: 4px;
+    background: var(--btn-face);
+    box-shadow: inset 0 1px 0 var(--highlight);
+    color: var(--muted);
+    font-family: var(--stencil);
+    font-size: .88rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+:root[data-theme="srs"] .sidenav a::before {
+    content: "";
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, rgb(255 255 255 / .55), transparent 55%), #43474a;
+    box-shadow: 0 0 0 1.5px #3d4043, 0 0 0 2.5px var(--rim);
+}
+
+:root[data-theme="srs"] .sidenav a:hover { background: var(--btn-hover); color: var(--text); }
+:root[data-theme="srs"] .sidenav a.active { background: var(--plate); color: var(--text); }
+:root[data-theme="srs"] .sidenav a.active::before {
+    background: radial-gradient(circle at 30% 25%, rgb(255 255 255 / .7), transparent 55%), var(--ok);
+    box-shadow: 0 0 0 1.5px #3d4043, 0 0 0 2.5px var(--rim), 0 0 7px var(--ok);
+}
+
+/* Pushbuttons */
+:root[data-theme="srs"] .btn {
+    border: 1px solid var(--rim);
+    border-radius: 4px;
+    background: var(--btn-face);
+    box-shadow: inset 0 1px 0 var(--highlight);
+    color: var(--text);
+    font-family: var(--mono);
+    letter-spacing: .04em;
+}
+
+:root[data-theme="srs"] .btn:hover:not(:disabled) { background: var(--btn-hover); }
+:root[data-theme="srs"] .btn:active:not(:disabled) { background: var(--btn-pressed); box-shadow: inset 0 -1px 0 var(--highlight); }
+:root[data-theme="srs"] .btn-primary { background: var(--steel-face); }
+:root[data-theme="srs"] .btn-primary:hover:not(:disabled) { background: var(--steel-hover); filter: none; }
+:root[data-theme="srs"] .btn-danger { background: linear-gradient(#8a4339, #5e2a23); }
+:root[data-theme="srs"] .btn-danger:hover:not(:disabled) { background: linear-gradient(#9a4b40, #6a3028); filter: none; }
+:root[data-theme="srs"] .btn-danger-outline { color: #e08a7e; }
+:root[data-theme="srs"] .btn-quiet.is-on { color: var(--warn); }
+
+/* Inset wells: inputs, alerts, tables */
+:root[data-theme="srs"] input[type=text],
+:root[data-theme="srs"] input[type=search],
+:root[data-theme="srs"] input[type=password],
+:root[data-theme="srs"] input[type=number],
+:root[data-theme="srs"] select,
+:root[data-theme="srs"] .new-key .key {
+    border: 1px solid var(--rim);
+    border-radius: 3px;
+    background: var(--well);
+    box-shadow: inset 0 2px 3px rgb(0 0 0 / .5), 0 1px 0 var(--highlight);
+    color: var(--text);
+}
+
+:root[data-theme="srs"] .alert { background: var(--well); border-color: var(--rim); box-shadow: inset 0 2px 3px rgb(0 0 0 / .4); }
+:root[data-theme="srs"] .alert-error { border-color: var(--danger); color: #e08a7e; }
+
+:root[data-theme="srs"] .table-wrap { background: var(--well); border-color: var(--rim); box-shadow: 0 1px 0 var(--highlight); }
+:root[data-theme="srs"] .grid th { background: var(--chrome); font-family: var(--mono); font-weight: 400; }
+:root[data-theme="srs"] .grid th,
+:root[data-theme="srs"] .grid td { border-bottom-color: var(--chrome); }
+:root[data-theme="srs"] .grid tbody tr:nth-child(even) td { background: var(--surface-2); }
+:root[data-theme="srs"] .event-list li { border-bottom-color: var(--chrome); }
+
+/* Health tiles: channel-display style readouts. */
+:root[data-theme="srs"] .tile { padding: .8rem 1.4rem; }
+:root[data-theme="srs"] .tile-label { font-family: var(--stencil); color: var(--accent); }
+:root[data-theme="srs"] .tile-value {
+    padding: .1rem .5rem;
+    border: 1px solid var(--rim);
+    border-radius: 3px;
+    background: #141617;
+    box-shadow: inset 0 2px 4px rgb(0 0 0 / .6), 0 1px 0 var(--highlight);
+    color: var(--ok);
+    font-family: var(--mono);
+    font-weight: 400;
+    text-shadow: 0 0 6px rgb(79 227 79 / .55);
+}
+
+:root[data-theme="srs"] .tile-value.status-starting { color: var(--warn); text-shadow: 0 0 6px rgb(224 185 92 / .5); }
+:root[data-theme="srs"] .tile-value.status-degraded,
+:root[data-theme="srs"] .tile-value.status-stopped { color: #e0705f; text-shadow: 0 0 6px rgb(194 91 78 / .6); }
+
+/* Indicator lamps and status markers */
+:root[data-theme="srs"] .dot { box-shadow: 0 0 0 2px #3d4043, 0 0 0 3px var(--rim); }
+:root[data-theme="srs"] .dot-red { box-shadow: 0 0 0 2px #3d4043, 0 0 0 3px var(--rim), 0 0 7px var(--red); }
+:root[data-theme="srs"] .dot-blue { box-shadow: 0 0 0 2px #3d4043, 0 0 0 3px var(--rim), 0 0 7px var(--blue); }
+:root[data-theme="srs"] .pill { border-radius: 3px; font-family: var(--mono); font-weight: 400; text-transform: uppercase; letter-spacing: .05em; }
+:root[data-theme="srs"] .pill-ok { background: #1c3a1f; border: 1px solid #2f6b33; text-shadow: 0 0 5px rgb(79 227 79 / .5); }
+:root[data-theme="srs"] .pill-wait { background: #3a321c; border: 1px solid #6b5a2f; }
+:root[data-theme="srs"] .tx-live { text-shadow: 0 0 5px rgb(79 227 79 / .5); }
+:root[data-theme="srs"] .tag,
+:root[data-theme="srs"] .badge { font-family: var(--mono); font-weight: 400; }
+:root[data-theme="srs"] .tag { background: var(--well); border-color: var(--rim); }
+:root[data-theme="srs"] .badge { color: var(--well); }
+:root[data-theme="srs"] .badge-quiet { color: var(--muted); }
+
+/* Toggle switches: inset slot with a metal knob, lit green when on. */
+:root[data-theme="srs"] .switch-track { background: var(--well); border: 1px solid var(--rim); box-shadow: inset 0 2px 3px rgb(0 0 0 / .6); }
+:root[data-theme="srs"] .switch-track::after { top: 2px; left: 2px; background: radial-gradient(circle at 35% 30%, #c0bcad, #5f6266 70%, #2c2f31); box-shadow: 0 1px 2px rgb(0 0 0 / .6); }
+:root[data-theme="srs"] .switch input:checked + .switch-track { background: #1c3a1f; border-color: #2f6b33; box-shadow: inset 0 2px 3px rgb(0 0 0 / .5), 0 0 6px rgb(79 227 79 / .35); }
+
+:root[data-theme="srs"] .channel-number { font-family: var(--mono); }
+:root[data-theme="srs"] .reconnect-spinner { border-color: var(--well); border-top-color: var(--ok); }
