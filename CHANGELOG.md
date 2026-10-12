@@ -5,6 +5,7 @@
 ### Added
 
 - Right-click the Pilot Roster and choose **Fit height to pilots** to turn automatic fitting back on after resizing the window yourself.
+- Channel names can now differ between Allies and Axis (web server only). The **Channel Names** page has Shared, Allies and Axis columns; an Allied or Axis name replaces the shared name for that coalition, and a blank one uses the shared name. Pilots see their own coalition's names once spawned, and the shared names in the lobby. The REST API adds `GET` and `PUT /api/v1/channel-names/allies` and `/axis`. Clients from before this release show only the shared names. ([#4](https://github.com/riaanjutte/IL2-SimpleRadioStandalone/issues/4))
 
 ### Fixed
 

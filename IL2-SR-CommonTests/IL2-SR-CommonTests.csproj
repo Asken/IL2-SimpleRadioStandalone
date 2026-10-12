@@ -85,6 +85,7 @@
     <Compile Include="Installer\InstallerTelemetryConfigurationTests.cs" />
     <Compile Include="Installer\LegacyAssemblyCleanupTests.cs" />
     <Compile Include="Installer\SrsInstallConsolidatorTests.cs" />
+    <Compile Include="Settings\ChannelNameSetTests.cs" />
     <Compile Include="Settings\UserDataPathsTests.cs" />
     <Compile Include="Settings\DefaultServerSettingsTests.cs" />
     <Compile Include="Network\CombatBoxCallsignRosterTests.cs" />

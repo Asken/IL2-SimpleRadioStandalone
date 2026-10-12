@@ -13,41 +13,90 @@
     </div>
 </div>
 
-<p class="muted">Names are optional. Blank channels use their standard channel number. Up to @ChannelNameSettings.MaximumNameLength characters.</p>
+<p class="muted">
+    Names are optional. Blank channels use their standard channel number. Allies and Axis names replace the
+    shared name for that coalition only; leave them blank to use the shared name. Older clients show only the
+    shared names. Up to @ChannelNameSettings.MaximumNameLength characters.
+</p>
 
 @if (_message != null)
 {
     <p class="alert" role="status">@_message</p>
 }
 
-<section class="panel">
-    <div class="channel-grid">
-        @for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
-        {
-            var number = channel;
-            <label class="channel-row">
-                <span class="channel-number mono">@number.ToString("00")</span>
-                <input type="text" maxlength="@ChannelNameSettings.MaximumNameLength" placeholder="Channel @number"
-                       value="@_names[number]" @oninput="e => _names[number] = e.Value?.ToString()" />
-            </label>
-        }
-    </div>
-</section>
+<div class="table-wrap">
+    <table class="grid channel-table">
+        <thead>
+            <tr>
+                <th class="channel-number">Ch</th>
+                <th>Shared</th>
+                <th>Allies</th>
+                <th>Axis</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
+            {
+                var number = channel;
+                <tr>
+                    <td class="channel-number mono">@number.ToString("00")</td>
+                    @foreach (var scope in Scopes)
+                    {
+                        var coalition = scope;
+                        <td>
+                            <input type="text" maxlength="@ChannelNameSettings.MaximumNameLength"
+                                   aria-label="@($"Channel {number} {ScopeLabel(coalition)} name")"
+                                   placeholder="@Placeholder(coalition, number)"
+                                   value="@_names[coalition][number]"
+                                   @oninput="e => _names[coalition][number] = e.Value?.ToString()" />
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
 
 @code {
-    private readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+    private static readonly int[] Scopes =
+    {
+        ChannelNameSettings.SharedCoalition,
+        ChannelNameSettings.AlliesCoalition,
+        ChannelNameSettings.AxisCoalition
+    };
+
+    private readonly Dictionary<int, Dictionary<int, string>> _names = new Dictionary<int, Dictionary<int, string>>();
     private string _message;
 
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
     protected override void OnInitialized() => Load();
 
+    private static string ScopeLabel(int coalition) =>
+        coalition == ChannelNameSettings.SharedCoalition ? "shared" : ChannelNameSettings.GetCoalitionLabel(coalition);
+
+    // A blank coalition name falls back to the shared name, so show that as the hint.
+    private string Placeholder(int coalition, int channel)
+    {
+        var shared = _names[ChannelNameSettings.SharedCoalition][channel];
+        return coalition != ChannelNameSettings.SharedCoalition && !string.IsNullOrWhiteSpace(shared)
+            ? shared
+            : $"Channel {channel}";
+    }
+
     private void Load()
     {
-        var configured = Admin.GetChannelNames();
-        for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
+        var configured = Admin.GetChannelNameSet();
+        foreach (var coalition in Scopes)
         {
-            _names[channel] = configured.TryGetValue(channel, out var name) ? name : string.Empty;
+            var stored = configured.Get(coalition);
+            var names = new Dictionary<int, string>();
+            for (var channel = 1; channel <= ChannelNameSettings.MaximumChannel; channel++)
+            {
+                names[channel] = stored.TryGetValue(channel, out var name) ? name : string.Empty;
+            }
+
+            _names[coalition] = names;
         }
 
         _message = null;
@@ -55,7 +104,11 @@
 
     private void Save()
     {
-        Admin.SetChannelNames(_names, Actor);
+        Admin.SetChannelNames(new ChannelNameSet(
+                _names[ChannelNameSettings.SharedCoalition],
+                _names[ChannelNameSettings.AlliesCoalition],
+                _names[ChannelNameSettings.AxisCoalition]),
+            Actor);
         Load();
         _message = "Channel names saved and sent to connected clients.";
     }

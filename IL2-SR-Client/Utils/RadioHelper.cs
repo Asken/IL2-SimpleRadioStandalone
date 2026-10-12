@@ -562,11 +562,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Utils
 
         internal static string GetEffectiveChannelName(int channel, string fallbackName)
         {
+            // Allied and Axis players see their own coalition's name for the channel when the server sets one.
             return ResolveChannelName(
                 channel,
-                SyncedServerSettings.Instance.GetChannelName(channel),
+                SyncedServerSettings.Instance.GetChannelName(channel, GetOwnCoalition()),
                 IsFriendlyRciActive(),
                 fallbackName);
+        }
+
+        internal static int GetOwnCoalition()
+        {
+            return ClientStateSingleton.Instance.PlayerGameState?.coalition ?? 0;
         }
 
         internal static string ResolveChannelName(

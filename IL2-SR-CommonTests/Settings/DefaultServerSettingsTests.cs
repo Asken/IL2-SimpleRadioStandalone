@@ -67,13 +67,52 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Settings
                 {ChannelNameSettings.GetSyncedSettingName(2), "Tower/ATC"}
             });
 
-            Assert.AreEqual("Command", settings.GetChannelName(1));
-            Assert.AreEqual("Tower/ATC", settings.GetChannelName(2));
+            Assert.AreEqual("Command", settings.GetChannelName(1, ChannelNameSettings.SharedCoalition));
+            Assert.AreEqual("Tower/ATC", settings.GetChannelName(2, ChannelNameSettings.SharedCoalition));
 
             settings.Decode(new Dictionary<string, string>());
 
-            Assert.IsNull(settings.GetChannelName(1));
-            Assert.IsNull(settings.GetChannelName(2));
+            Assert.IsNull(settings.GetChannelName(1, ChannelNameSettings.SharedCoalition));
+            Assert.IsNull(settings.GetChannelName(2, ChannelNameSettings.SharedCoalition));
+        }
+
+        [TestMethod]
+        public void SyncedCoalitionChannelNamesReplaceSharedNamesForThatCoalitionOnly()
+        {
+            var settings = new SyncedServerSettings();
+            settings.Decode(new Dictionary<string, string>
+            {
+                {ChannelNameSettings.GetSyncedSettingName(1), "Command"},
+                {ChannelNameSettings.GetSyncedSettingName(2), "Tower/ATC"},
+                {ChannelNameSettings.GetSyncedSettingName(1, ChannelNameSettings.AlliesCoalition), "Kenway"},
+                {ChannelNameSettings.GetSyncedSettingName(1, ChannelNameSettings.AxisCoalition), "Freya"}
+            });
+
+            Assert.AreEqual("Kenway", settings.GetChannelName(1, ChannelNameSettings.AlliesCoalition));
+            Assert.AreEqual("Freya", settings.GetChannelName(1, ChannelNameSettings.AxisCoalition));
+            Assert.AreEqual("Command", settings.GetChannelName(1, ChannelNameSettings.SharedCoalition),
+                "Spectators and the lobby see the shared name.");
+            Assert.AreEqual("Tower/ATC", settings.GetChannelName(2, ChannelNameSettings.AlliesCoalition),
+                "A channel without a coalition name falls back to the shared name.");
+
+            var allied = settings.GetChannelNames(ChannelNameSettings.AlliesCoalition);
+            Assert.AreEqual("Kenway", allied[1]);
+            Assert.AreEqual("Tower/ATC", allied[2]);
+            Assert.IsFalse(allied.ContainsValue("Freya"), "The other coalition's names are not shown.");
+
+            // Reconnecting to a server that only sends shared names (e.g. the WPF server) drops the coalition names.
+            settings.Decode(new Dictionary<string, string>
+            {
+                {ChannelNameSettings.GetSyncedSettingName(1), "Ops"}
+            });
+
+            Assert.AreEqual("Ops", settings.GetChannelName(1, ChannelNameSettings.AlliesCoalition));
+            Assert.AreEqual("Ops", settings.GetChannelName(1, ChannelNameSettings.AxisCoalition));
+
+            settings.Decode(new Dictionary<string, string>());
+
+            Assert.IsNull(settings.GetChannelName(1, ChannelNameSettings.AlliesCoalition));
+            Assert.IsNull(settings.GetChannelName(1, ChannelNameSettings.AxisCoalition));
         }
 
         [TestMethod]

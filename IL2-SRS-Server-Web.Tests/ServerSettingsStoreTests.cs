@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -138,6 +140,103 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             store.SetChannelNames(new Dictionary<int, string>(store.GetChannelNames()) { [1] = "Ops" });
 
             Assert.Equal(new Dictionary<int, string> { [1] = "Ops", [2] = "Strike Package" }, store.GetChannelNames());
+        }
+
+        [Fact]
+        public void CoalitionChannelNamesAreStoredSeparatelyAndSurviveARestart()
+        {
+            using var temp = new TempDirectory();
+            var store = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
+
+            store.SetChannelNames(new Dictionary<int, string> { [1] = "Command", [2] = "Tower" });
+            store.SetChannelNames(ChannelNameSettings.AlliesCoalition, new Dictionary<int, string> { [1] = "Kenway", [2] = "Dogrose" });
+            store.SetChannelNames(ChannelNameSettings.AxisCoalition, new Dictionary<int, string> { [1] = " Freya ", [30] = "out of range" });
+
+            // Replacing one coalition's names leaves the shared names and the other coalition alone.
+            store.SetChannelNames(ChannelNameSettings.AlliesCoalition, new Dictionary<int, string> { [1] = "Kenway" });
+
+            var reopened = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
+            Assert.Equal(new Dictionary<int, string> { [1] = "Command", [2] = "Tower" }, reopened.GetChannelNames());
+            Assert.Equal(new Dictionary<int, string> { [1] = "Kenway" }, reopened.GetChannelNames(ChannelNameSettings.AlliesCoalition));
+            Assert.Equal(new Dictionary<int, string> { [1] = "Freya" }, reopened.GetChannelNames(ChannelNameSettings.AxisCoalition));
+
+            var synced = new Dictionary<string, string>();
+            reopened.GetChannelNameSet().AddSyncedSettings(synced);
+            Assert.Equal("Command", synced["CHANNEL_NAME_1"]);
+            Assert.Equal("Kenway", synced["CHANNEL_NAME_ALLIES_1"]);
+            Assert.Equal("Freya", synced["CHANNEL_NAME_AXIS_1"]);
+            Assert.False(synced.ContainsKey("CHANNEL_NAME_ALLIES_2"));
+        }
+
+        [Fact]
+        public void SavingAllChannelNamesReplacesEverySet()
+        {
+            using var temp = new TempDirectory();
+            var store = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
+            store.SetChannelNames(ChannelNameSettings.AxisCoalition, new Dictionary<int, string> { [3] = "Schlageter" });
+
+            store.SetChannelNames(new ChannelNameSet(
+                new Dictionary<int, string> { [1] = "Command" },
+                new Dictionary<int, string> { [1] = "Kenway" },
+                new Dictionary<int, string>()));
+
+            var reopened = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
+            Assert.Equal("Command", reopened.GetChannelNames()[1]);
+            Assert.Equal("Kenway", reopened.GetChannelNames(ChannelNameSettings.AlliesCoalition)[1]);
+            Assert.Empty(reopened.GetChannelNames(ChannelNameSettings.AxisCoalition));
+        }
+
+        [Fact]
+        public void UpgradesAVersionOneDatabaseAndKeepsItsChannelNames()
+        {
+            using var temp = new TempDirectory();
+            var path = temp.File(SrsDatabase.FileName);
+            using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString()))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE channel_names (channel INTEGER PRIMARY KEY, name TEXT NOT NULL);
+INSERT INTO channel_names (channel, name) VALUES (1, 'Ops');
+PRAGMA user_version = 1;";
+                command.ExecuteNonQuery();
+            }
+
+            SqliteConnection.ClearAllPools();
+            var database = new SrsDatabase(path);
+            Assert.False(database.WasCreated);
+
+            var store = new ServerSettingsStore(database, NoOverrides);
+            Assert.Equal("Ops", store.GetChannelNames()[1]);
+            Assert.Empty(store.GetChannelNames(ChannelNameSettings.AlliesCoalition));
+
+            store.SetChannelNames(ChannelNameSettings.AlliesCoalition, new Dictionary<int, string> { [1] = "Kenway" });
+            Assert.Equal("Kenway", new ServerSettingsStore(database, NoOverrides).GetChannelNames(ChannelNameSettings.AlliesCoalition)[1]);
+
+            using var check = database.Open();
+            using var version = check.CreateCommand();
+            version.CommandText = "PRAGMA user_version;";
+            Assert.Equal(2L, (long)version.ExecuteScalar());
+        }
+
+        [Theory]
+        [InlineData("allies", ChannelNameSettings.AlliesCoalition)]
+        [InlineData("Axis", ChannelNameSettings.AxisCoalition)]
+        [InlineData("AXIS", ChannelNameSettings.AxisCoalition)]
+        public void ApiAcceptsCoalitionNames(string value, int expected)
+        {
+            Assert.True(Api.ApiEndpoints.TryParseCoalition(value, out var coalition));
+            Assert.Equal(expected, coalition);
+        }
+
+        [Theory]
+        [InlineData("shared")]
+        [InlineData("1")]
+        [InlineData("")]
+        public void ApiRejectsOtherCoalitionNames(string value)
+        {
+            Assert.False(Api.ApiEndpoints.TryParseCoalition(value, out _));
         }
 
         [Fact]

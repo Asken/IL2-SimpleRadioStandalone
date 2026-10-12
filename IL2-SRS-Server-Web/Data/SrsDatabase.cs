@@ -12,7 +12,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
     {
         public const string FileName = "srs.db";
 
-        private const int SchemaVersion = 1;
+        // 2: coalition_channel_names. Every statement below is CREATE ... IF NOT EXISTS, so an older
+        // database is upgraded by running the whole script again.
+        private const int SchemaVersion = 2;
 
         private readonly string _connectionString;
 
@@ -88,6 +90,12 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS channel_names (
     channel INTEGER PRIMARY KEY,
     name    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS coalition_channel_names (
+    coalition INTEGER NOT NULL,
+    channel   INTEGER NOT NULL,
+    name      TEXT NOT NULL,
+    PRIMARY KEY (coalition, channel)
 );
 CREATE TABLE IF NOT EXISTS bans (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

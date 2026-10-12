@@ -26,7 +26,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
         private readonly IReadOnlyDictionary<string, string> _overrides;
         private readonly ConcurrentDictionary<string, SettingValue> _values = new ConcurrentDictionary<string, SettingValue>();
         private readonly object _writeLock = new object();
-        private volatile Dictionary<int, string> _channelNames;
+        private volatile ChannelNameSet _channelNames = ChannelNameSet.Empty;
 
         public ServerSettingsStore(SrsDatabase database, IReadOnlyDictionary<string, string> overrides)
         {
@@ -119,15 +119,32 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
             return settings;
         }
 
-        public Dictionary<int, string> GetChannelNames()
-        {
-            return new Dictionary<int, string>(_channelNames);
-        }
+        /// <summary>The shared channel names, used by every coalition without its own name for a channel.</summary>
+        public Dictionary<int, string> GetChannelNames() => _channelNames.Get(ChannelNameSettings.SharedCoalition);
 
+        /// <summary>The names stored for one coalition (Allies or Axis), or the shared names for SharedCoalition.</summary>
+        public Dictionary<int, string> GetChannelNames(int coalition) => _channelNames.Get(coalition);
+
+        public ChannelNameSet GetChannelNameSet() => _channelNames;
+
+        /// <summary>Replaces the shared channel names.</summary>
         public void SetChannelNames(IDictionary<int, string> channelNames)
         {
-            var normalized = Normalize(channelNames);
+            SetChannelNames(ChannelNameSettings.SharedCoalition, channelNames);
+        }
 
+        /// <summary>Replaces one coalition's channel names (or the shared names); the other sets are unchanged.</summary>
+        public void SetChannelNames(int coalition, IDictionary<int, string> channelNames)
+        {
+            lock (_writeLock)
+            {
+                SetChannelNames(_channelNames.With(coalition, channelNames));
+            }
+        }
+
+        /// <summary>Replaces the shared, Allied and Axis channel names in one transaction.</summary>
+        public void SetChannelNames(ChannelNameSet channelNames)
+        {
             lock (_writeLock)
             {
                 using var connection = _database.Open();
@@ -135,11 +152,11 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
                 using (var delete = connection.CreateCommand())
                 {
                     delete.Transaction = transaction;
-                    delete.CommandText = "DELETE FROM channel_names;";
+                    delete.CommandText = "DELETE FROM channel_names; DELETE FROM coalition_channel_names;";
                     delete.ExecuteNonQuery();
                 }
 
-                foreach (var channelName in normalized)
+                foreach (var channelName in channelNames.Get(ChannelNameSettings.SharedCoalition))
                 {
                     using var insert = connection.CreateCommand();
                     insert.Transaction = transaction;
@@ -149,8 +166,23 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
                     insert.ExecuteNonQuery();
                 }
 
+                foreach (var coalition in ChannelNameSettings.Coalitions)
+                {
+                    foreach (var channelName in channelNames.Get(coalition))
+                    {
+                        using var insert = connection.CreateCommand();
+                        insert.Transaction = transaction;
+                        insert.CommandText =
+                            "INSERT INTO coalition_channel_names (coalition, channel, name) VALUES ($coalition, $channel, $name);";
+                        insert.Parameters.AddWithValue("$coalition", coalition);
+                        insert.Parameters.AddWithValue("$channel", channelName.Key);
+                        insert.Parameters.AddWithValue("$name", channelName.Value);
+                        insert.ExecuteNonQuery();
+                    }
+                }
+
                 transaction.Commit();
-                _channelNames = normalized;
+                _channelNames = channelNames;
             }
         }
 
@@ -201,6 +233,8 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
         {
             var stored = new Dictionary<string, string>(StringComparer.Ordinal);
             var channelNames = new Dictionary<int, string>();
+            var alliedChannelNames = new Dictionary<int, string>();
+            var axisChannelNames = new Dictionary<int, string>();
 
             using (var connection = _database.Open())
             {
@@ -223,6 +257,24 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
                         channelNames[reader.GetInt32(0)] = reader.GetString(1);
                     }
                 }
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "SELECT coalition, channel, name FROM coalition_channel_names;";
+                    using var reader = command.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var coalition = reader.GetInt32(0);
+                        if (coalition == ChannelNameSettings.AlliesCoalition)
+                        {
+                            alliedChannelNames[reader.GetInt32(1)] = reader.GetString(2);
+                        }
+                        else if (coalition == ChannelNameSettings.AxisCoalition)
+                        {
+                            axisChannelNames[reader.GetInt32(1)] = reader.GetString(2);
+                        }
+                    }
+                }
             }
 
             foreach (ServerSettingsKeys key in Enum.GetValues(typeof(ServerSettingsKeys)))
@@ -243,28 +295,7 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.up
                 }
             }
 
-            _channelNames = Normalize(channelNames);
-        }
-
-        private static Dictionary<int, string> Normalize(IDictionary<int, string> channelNames)
-        {
-            var normalized = new Dictionary<int, string>();
-            if (channelNames == null)
-            {
-                return normalized;
-            }
-
-            foreach (var channelName in channelNames)
-            {
-                var name = ChannelNameSettings.NormalizeName(channelName.Value);
-                if (channelName.Key >= 1 && channelName.Key <= ChannelNameSettings.MaximumChannel &&
-                    !string.IsNullOrWhiteSpace(name))
-                {
-                    normalized[channelName.Key] = name;
-                }
-            }
-
-            return normalized;
+            _channelNames = new ChannelNameSet(channelNames, alliedChannelNames, axisChannelNames);
         }
 
         private static IReadOnlyDictionary<string, string> ValidateOverrides(IReadOnlyDictionary<string, string> overrides)
