@@ -281,5 +281,7 @@ global.cfg
 # Source audio retained locally from the cancelled neutral-lobby music experiment
 /Resources/*.ogg
 
-# Local secrets for docker compose
-/IL2-SRS-Server-Web/.env
+# Local secrets (docker compose and other tools)
+.env
+.env.*
+!.env.example
