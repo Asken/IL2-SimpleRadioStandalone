@@ -69,7 +69,10 @@ else
                             }
                         </td>
                         <td>
-                            @string.Join(", ", integration.TriggerTypes.Select(t => SrsEventTypes.Find(t)?.Label ?? t))
+                            @foreach (var trigger in integration.TriggerTypes)
+                            {
+                                <div>@(SrsEventTypes.Find(trigger)?.Label ?? trigger)</div>
+                            }
                             @if (integration.Conditions.Count > 0)
                             {
                                 <div class="muted small">
