@@ -82,41 +82,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Audio
 
         public static byte[] CreateBalancedMix(byte[] pcmAudio, float balance)
         {
-            float left = 1.0f;
-            float right = 1.0f;
-
-            //right
-            if (balance > 0)
-            {
-                var leftBias = 1- Math.Abs(balance);
-                var rightBias = Math.Abs(balance);
-                //right
-                left = left * leftBias;
-                right = right * rightBias;
-            }
-            else if (balance < 0)
-            {
-                var leftBias = Math.Abs(balance);
-                var rightBias = 1 - Math.Abs(balance);
-                //left
-                left = left * leftBias;
-                right = right * rightBias;
-            }
-            else
-            {
-                //equal balance
-                left = 0.5f;
-                right = 0.5f;
-            }
-
-            if(left > 1f)
-            {
-                left = 1f;
-            }
-            if (right > 1f)
-            {
-                right = 1f;
-            }
+            // Linear pan from -1 (left only) through 0 (half to each side) to +1 (right only).
+            // The gains always add up to 1, so overall loudness stays the same wherever the slider sits.
+            balance = Math.Max(-1f, Math.Min(1f, balance));
+            float left = (1f - balance) / 2f;
+            float right = (1f + balance) / 2f;
 
             var stereoMix = new byte[pcmAudio.Length * 2];
             for (var i = 0; i < pcmAudio.Length / 2; i++)

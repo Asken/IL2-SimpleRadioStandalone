@@ -4,8 +4,19 @@
 
 ### Added
 
-- New web server: the IL2-SRS server can now run in Docker or as a Windows service and is managed from the browser. It includes a dashboard, client administration (mute, kick, ban with reason and duration), settings, channel names, a ban list, an event log of admin actions and client connections, and a REST API with read and write API keys. Settings can be fixed from environment variables. An existing `server.cfg` and `banned.txt` are imported on first start. The Windows server window remains available. See **Web server (Docker and Windows service)** in the server administrator guides.
+- Right-click the Pilot Roster and choose **Fit height to pilots** to turn automatic fitting back on after resizing the window yourself.
 - The web server's theme button now also offers an **IL-2 SRS** theme that matches the client's grey equipment-panel look, alongside Desktop, Light and Dark.
+
+### Fixed
+
+- The Pilot Roster fits its height to the pilots listed again after updating. In 1.0.5.0-beta.1, any roster height saved by an earlier version was treated as a size you had chosen, which turned automatic fitting off for most existing users. Only dragging the roster's edge now turns it off.
+- The intercom and radio audio channel balance sliders now move the sound steadily from left to right. Previously the inner half of each side worked backwards, so a slider set slightly left played mostly in the right ear and vice versa, and only the outer half moved the sound the expected way. Check your balance settings after updating: positions between the centre and halfway now sound on the side the slider points to.
+
+## IL2-SRS 1.0.5.0-beta.1
+
+### Added
+
+- New web server (preview): the IL2-SRS server can now run in Docker or as a Windows service and is managed from the browser. It includes a dashboard, client administration (mute, kick, ban with reason and duration), settings, channel names, a ban list, an event log of admin actions and client connections, and a REST API with read and write API keys. Settings can be fixed from environment variables. An existing `server.cfg` and `banned.txt` are imported on first start. The Windows server window remains available. Download the self-contained Windows build, `IL2-SRS-Server-Web-1.0.5.0-beta.1-win-x64.zip`, from this release, or use the `asken/il2-srs-server:preview` Docker image. See **Web server (Docker and Windows service)** in the server administrator guides. Thanks to Asken for contributing it.
 - Bind **Mute / Unmute Radio 1** and **Mute / Unmute Radio 2** in the Controls tab to mute or unmute a specific radio, whichever radio is currently selected.
 
 ### Changed

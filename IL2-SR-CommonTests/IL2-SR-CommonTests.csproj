@@ -73,6 +73,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="Audio\AudioProviderBalanceTests.cs" />
     <Compile Include="Audio\RadioCollisionEffectProcessorTests.cs" />
     <Compile Include="DCSState\PlayerGameStateTests.cs" />
     <Compile Include="Helpers\AirfieldCodeLookupTests.cs" />
