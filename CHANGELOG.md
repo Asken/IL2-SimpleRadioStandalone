@@ -5,6 +5,11 @@
 ### Added
 
 - Right-click the Pilot Roster and choose **Fit height to pilots** to turn automatic fitting back on after resizing the window yourself.
+- The web server's theme button now also offers an **IL-2 SRS** theme that matches the client's grey equipment-panel look, alongside Desktop, Light and Dark.
+
+### Changed
+
+- The web server no longer draws a focus outline around the page heading in any theme. Screen readers still move to the heading when you open a page.
 
 ### Fixed
 

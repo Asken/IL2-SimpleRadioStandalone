@@ -5,11 +5,14 @@ Docker or directly on Windows (console or Windows service), and is wire-compatib
 clients. It replaces the WPF server window; the WPF server stays in the repository until this one has
 been proven in production.
 
+![The admin UI dashboard in the IL-2 SRS theme](docs/admin-ui-dashboard.png)
+
 What it adds over the WPF server:
 
 - Admin UI in the browser: health, clients (mute, kick, ban), settings, channel names, bans, event log and API keys.
-  Times are shown in each viewer's own time zone; the **Desktop / Light / Dark** button in the top bar
-  switches the theme (Desktop follows the system setting) and is remembered per browser.
+  Times are shown in each viewer's own time zone; the **Desktop / Light / Dark / IL-2 SRS** button in the
+  top bar switches the theme (Desktop follows the system setting; IL-2 SRS matches the client's grey
+  equipment panels) and is remembered per browser.
 - SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
 - Event log of logins, admin actions, server start/stop and client connections, with automatic retention.

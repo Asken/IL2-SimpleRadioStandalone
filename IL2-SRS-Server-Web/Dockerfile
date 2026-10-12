@@ -16,8 +16,16 @@ RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /a
 
 # Alpine (musl): a minimal base without the Ubuntu packages the server never uses
 # (login, tar, ICU, systemd libraries, ...), which carried unfixable scanner findings.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
+# Pinned by digest so every build of a commit starts from the same base. When Microsoft republishes
+# 10.0-alpine, update the digest here and in the base.digest label below.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:f62a272ac1b46e83f56b8ed0416572f31cd1128e2c4a5e63eb34d348e4a36095
 WORKDIR /app
+
+# The pinned base (built 2026-09-18) still ships zlib 1.3.2-r0, vulnerable to CVE-2026-85091
+# (https://github.com/advisories/GHSA-g5fp-32jq-cfw2), and OpenSSL 3.5.8. Upgrade only these packages, to at
+# least the fixed versions; the build fails if Alpine can't provide them. Exact versions aren't pinned because
+# Alpine drops superseded builds from its repositories. Remove this step once a newer base digest includes them.
+RUN apk add --no-cache --upgrade 'zlib>=1.3.2-r1' 'libssl3>=3.5.9-r0' 'libcrypto3>=3.5.9-r0'
 
 # Set by scripts/Publish-DockerImage.ps1; plain builds are labelled "dev".
 ARG VERSION=dev
@@ -31,7 +39,8 @@ LABEL org.opencontainers.image.title="IL2-SRS Server" \
       org.opencontainers.image.documentation="https://github.com/riaanjutte/IL2-SimpleRadioStandalone/blob/master/IL2-SRS-Server-Web/README.md" \
       org.opencontainers.image.url="$IMAGE_URL" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
-      org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0-alpine"
+      org.opencontainers.image.base.name="mcr.microsoft.com/dotnet/aspnet:10.0-alpine" \
+      org.opencontainers.image.base.digest="sha256:f62a272ac1b46e83f56b8ed0416572f31cd1128e2c4a5e63eb34d348e4a36095"
 
 ENV SRS_DATA_DIR=/data \
     ASPNETCORE_HTTP_PORTS=8080 \
