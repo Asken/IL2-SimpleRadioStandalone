@@ -32,8 +32,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         public Type ConfigEditor => typeof(Microsoft.AspNetCore.Components.ComponentBase);
         public IReadOnlyCollection<string> SecretFields { get; } = new[] { "token" };
 
-        public string Validate(JsonObject config) =>
-            config["token"] is null ? "Enter a token." : null;
+        public IReadOnlyDictionary<string, string> Validate(JsonObject config) =>
+            config["token"] is null
+                ? new Dictionary<string, string> { ["token"] = "Enter a token." }
+                : new Dictionary<string, string>();
 
         public Task<IntegrationResult> ExecuteAsync(IntegrationExecutionContext context, CancellationToken cancellationToken)
         {
@@ -215,7 +217,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             events.EventPublished += published.Add;
 
             Assert.Equal("Enter a name.", service.Save(IntegrationStoreTests.Integration(new JsonObject(), name: " "), "admin", out _));
-            Assert.Equal("Choose a trigger event.",
+            Assert.Equal("Choose the event that runs this integration.",
                 service.Save(IntegrationStoreTests.Integration(new JsonObject(), trigger: "nope"), "admin", out _));
             Assert.Equal("Enter a token.", service.Save(IntegrationStoreTests.Integration(new JsonObject()), "admin", out _));
 
@@ -232,6 +234,54 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 "admin.integration_deleted"
             }, published.Select(e => e.Type));
             Assert.False(published[2].Payload.GetProperty("integration").GetProperty("enabled").GetBoolean());
+        }
+
+        [Fact]
+        public void ReportsEveryProblemByFieldInTheOrderOfTheForm()
+        {
+            using var temp = new TempDirectory();
+            var (service, _, _) = Create(temp);
+            var draft = new IntegrationDefinition
+            {
+                Name = "",
+                TriggerType = "client.connected",
+                Conditions = new[]
+                {
+                    new IntegrationCondition("", ConditionOperator.GreaterThan, "ignored: no field"),
+                    new IntegrationCondition("client.coalition", ConditionOperator.GreaterThan, "red"),
+                    new IntegrationCondition("client.name", ConditionOperator.Contains, " ")
+                },
+                ActionType = RecordingAction.ActionType,
+                ActionConfig = new JsonObject(),
+                RetryMode = RetryMode.Fixed,
+                MaxRetries = 0
+            };
+
+            var validation = service.Validate(draft);
+
+            Assert.False(validation.IsValid);
+            Assert.Equal(new[]
+            {
+                "name", "conditions[1].value", "conditions[2].value", "config.token", "maxRetries"
+            }, validation.Errors.Keys);
+            Assert.Equal("Enter a number.", validation.Errors["conditions[1].value"]);
+            Assert.Equal("Enter a value.", validation.Errors["conditions[2].value"]);
+            Assert.Equal("Enter a name.", validation.FirstError);
+        }
+
+        [Fact]
+        public void SavingDropsConditionRowsWithoutAField()
+        {
+            using var temp = new TempDirectory();
+            var (service, _, _) = Create(temp);
+
+            Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "t" }, conditions: new[]
+            {
+                new IntegrationCondition("", ConditionOperator.Is, null),
+                new IntegrationCondition("client.name", ConditionOperator.Is, "Hartmann")
+            }), "admin", out var saved));
+
+            Assert.Equal("client.name", Assert.Single(service.Store.Get(saved.Id).Conditions).Field);
         }
 
         [Fact]

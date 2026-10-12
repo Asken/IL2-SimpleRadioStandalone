@@ -51,37 +51,41 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public Type ConfigEditor => typeof(HttpWebhookEditor);
         public IReadOnlyCollection<string> SecretFields { get; } = new[] { UrlField, HeadersField };
 
-        public string Validate(JsonObject config)
+        public IReadOnlyDictionary<string, string> Validate(JsonObject config)
         {
+            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
             var url = config.GetText(UrlField);
-            if (string.IsNullOrWhiteSpace(url))
+            if (url == null)
             {
-                return "Enter the URL.";
+                errors[UrlField] = "Enter the URL.";
             }
-
-            if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            else if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) ||
+                     (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             {
-                return "The URL must start with http:// or https://.";
+                errors[UrlField] = "Enter a URL starting with http:// or https://.";
             }
 
             if (!Methods.Contains(Method(config)))
             {
-                return "Choose POST, PUT or PATCH.";
+                errors[MethodField] = "Choose POST, PUT or PATCH.";
             }
 
             if (!MediaTypeHeaderValue.TryParse(ContentType(config), out _))
             {
-                return "The content type is not valid, e.g. application/json.";
+                errors[ContentTypeField] = "Enter a content type such as application/json.";
             }
 
             if (ParseHeaders(config.GetText(HeadersField), out _) is { } headerError)
             {
-                return headerError;
+                errors[HeadersField] = headerError;
             }
 
-            var error = MessageTemplate.Check(config.GetText(BodyField));
-            return error == null ? null : "The body template: " + error;
+            if (MessageTemplate.Check(config.GetText(BodyField)) is { } bodyError)
+            {
+                errors[BodyField] = bodyError;
+            }
+
+            return errors;
         }
 
         public async Task<IntegrationResult> ExecuteAsync(IntegrationExecutionContext context,

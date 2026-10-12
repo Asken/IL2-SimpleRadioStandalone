@@ -239,6 +239,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             }
 
             long id;
+            using (var invalid = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
+            {
+                invalid.Content = JsonContent.Create(new { name = "", trigger = "admin.setting_changed", action = RecordingAction.ActionType });
+                using var response = await _http.SendAsync(invalid, token);
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(token);
+                Assert.Equal("Enter a name.", body.GetProperty("error").GetString());
+                Assert.Equal("Enter a token.", body.GetProperty("errors").GetProperty("config.token").GetString());
+            }
+
             using (var create = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
             {
                 create.Content = JsonContent.Create(new

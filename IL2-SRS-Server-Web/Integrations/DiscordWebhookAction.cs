@@ -59,36 +59,46 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public Type ConfigEditor => typeof(DiscordWebhookEditor);
         public IReadOnlyCollection<string> SecretFields { get; } = new[] { WebhookUrlField };
 
-        public string Validate(JsonObject config)
+        public IReadOnlyDictionary<string, string> Validate(JsonObject config)
         {
+            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
             var url = config.GetText(WebhookUrlField);
-            if (string.IsNullOrWhiteSpace(url))
+            if (url == null)
             {
-                return "Enter the Discord webhook URL.";
+                errors[WebhookUrlField] = "Enter the Discord webhook URL.";
             }
-
-            if (!IsWebhookUrl(url))
+            else if (!IsWebhookUrl(url))
             {
-                return "The webhook URL must look like https://discord.com/api/webhooks/….";
+                errors[WebhookUrlField] = "Enter a Discord webhook URL, https://discord.com/api/webhooks/….";
             }
 
             var style = config.GetText(StyleField) ?? StyleText;
             if (style != StyleText && style != StyleEmbed)
             {
-                return "Choose a message style.";
-            }
-
-            if (config.GetText(ColorField) is { } color && !TryParseColor(color, out _))
-            {
-                return "The colour must be a hex value such as #5865f2.";
+                errors[StyleField] = "Choose a message style.";
             }
 
             if ((config.GetText(UsernameField)?.Length ?? 0) > MaxUsernameLength)
             {
-                return $"The bot name can be at most {MaxUsernameLength} characters.";
+                errors[UsernameField] = $"The bot name can be at most {MaxUsernameLength} characters.";
             }
 
-            return Check("message", config.GetText(ContentField)) ?? Check("title", config.GetText(TitleField));
+            if (MessageTemplate.Check(config.GetText(TitleField)) is { } titleError)
+            {
+                errors[TitleField] = titleError;
+            }
+
+            if (config.GetText(ColorField) is { } color && !TryParseColor(color, out _))
+            {
+                errors[ColorField] = "Enter a hex colour such as #5865f2.";
+            }
+
+            if (MessageTemplate.Check(config.GetText(ContentField)) is { } contentError)
+            {
+                errors[ContentField] = contentError;
+            }
+
+            return errors;
         }
 
         public async Task<IntegrationResult> ExecuteAsync(IntegrationExecutionContext context,
@@ -232,12 +242,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
 
             return body;
-        }
-
-        private static string Check(string name, string template)
-        {
-            var error = MessageTemplate.Check(template);
-            return error == null ? null : $"The {name} template: {error}";
         }
 
         private static string Template(JsonObject config, string field, string fallback)

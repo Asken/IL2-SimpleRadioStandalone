@@ -114,12 +114,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             var (action, _) = Create();
 
-            Assert.Equal("Enter the Discord webhook URL.", action.Validate(new JsonObject()));
-            Assert.NotNull(action.Validate(new JsonObject { ["webhookUrl"] = "https://example.com/api/webhooks/1/a" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["webhookUrl"] = "http://discord.com/api/webhooks/1/a" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["webhookUrl"] = Url, ["content"] = "{{ if }}" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["webhookUrl"] = Url, ["color"] = "red" }));
-            Assert.Null(action.Validate(new JsonObject { ["webhookUrl"] = Url }));
+            Assert.Equal("Enter the Discord webhook URL.", action.Validate(new JsonObject())["webhookUrl"]);
+            Assert.Equal(new[] { "webhookUrl" },
+                action.Validate(new JsonObject { ["webhookUrl"] = "https://example.com/api/webhooks/1/a" }).Keys);
+            Assert.Equal(new[] { "webhookUrl" },
+                action.Validate(new JsonObject { ["webhookUrl"] = "http://discord.com/api/webhooks/1/a" }).Keys);
+            Assert.StartsWith("Template error at line 1",
+                action.Validate(new JsonObject { ["webhookUrl"] = Url, ["content"] = "{{ if }}" })["content"]);
+            Assert.Equal(new[] { "title", "color" }, action.Validate(new JsonObject
+            {
+                ["webhookUrl"] = Url, ["title"] = "{{ end }}", ["color"] = "red"
+            }).Keys);
+            Assert.Empty(action.Validate(new JsonObject { ["webhookUrl"] = Url }));
         }
 
         [Fact]
@@ -240,13 +246,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             var action = new HttpWebhookAction(new FakeWebhook());
 
-            Assert.Equal("Enter the URL.", action.Validate(new JsonObject()));
-            Assert.NotNull(action.Validate(new JsonObject { ["url"] = "ftp://example.com" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["url"] = Url, ["method"] = "DELETE" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["url"] = Url, ["headers"] = "no colon here" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["url"] = Url, ["headers"] = "Content-Type: text/plain" }));
-            Assert.NotNull(action.Validate(new JsonObject { ["url"] = Url, ["body"] = "{{ end }}" }));
-            Assert.Null(action.Validate(new JsonObject
+            Assert.Equal("Enter the URL.", action.Validate(new JsonObject())["url"]);
+            Assert.Contains("url", action.Validate(new JsonObject { ["url"] = "ftp://example.com" }).Keys);
+            Assert.Contains("method", action.Validate(new JsonObject { ["url"] = Url, ["method"] = "DELETE" }).Keys);
+            Assert.Contains("headers", action.Validate(new JsonObject { ["url"] = Url, ["headers"] = "no colon here" }).Keys);
+            Assert.Contains("headers", action.Validate(new JsonObject { ["url"] = Url, ["headers"] = "Content-Type: text/plain" }).Keys);
+            Assert.Contains("body", action.Validate(new JsonObject { ["url"] = Url, ["body"] = "{{ end }}" }).Keys);
+            Assert.Empty(action.Validate(new JsonObject
             {
                 ["url"] = Url, ["method"] = "put", ["headers"] = "Authorization: Bearer abc\nX-Source: srs"
             }));
@@ -324,7 +330,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 
     public class ActionEditorTests
     {
-        private static async Task<string> Render<T>(JsonObject config, IReadOnlyDictionary<string, string> hints = null)
+        private static async Task<string> Render<T>(JsonObject config, IReadOnlyDictionary<string, string> hints = null,
+            IReadOnlyDictionary<string, string> errors = null)
             where T : IComponent
         {
             await using var services = new ServiceCollection().BuildServiceProvider();
@@ -335,7 +342,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 {
                     [nameof(IntegrationActionEditor.Config)] = config,
                     [nameof(IntegrationActionEditor.SecretHints)] = hints ?? new Dictionary<string, string>(),
-                    [nameof(IntegrationActionEditor.Trigger)] = SrsEventTypes.ClientConnected
+                    [nameof(IntegrationActionEditor.Trigger)] = SrsEventTypes.ClientConnected,
+                    [nameof(IntegrationActionEditor.Errors)] = errors ?? new Dictionary<string, string>()
                 }));
                 return WebUtility.HtmlDecode(output.ToHtmlString());
             });
@@ -354,6 +362,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Contains("Stored — ends in 0Jdl", html);
             Assert.Contains("id=\"discord-color\"", html);
             Assert.Contains($"Client connected\n\n{name} (Red) joined", html);
+        }
+
+        [Fact]
+        public async Task EditorsMarkTheFieldsThePageSaysAreInvalid()
+        {
+            var html = await Render<HttpWebhookEditor>(new JsonObject(),
+                errors: new Dictionary<string, string> { ["url"] = "Enter the URL." });
+
+            Assert.Contains("aria-invalid=\"true\" aria-describedby=\"config-url-error\"", html);
+            Assert.Contains("<span id=\"config-url-error\" class=\"field-error\">Enter the URL.</span>", html);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "aria-invalid"));
         }
 
         [Fact]

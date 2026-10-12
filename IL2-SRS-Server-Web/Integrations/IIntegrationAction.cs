@@ -31,8 +31,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// </summary>
         IReadOnlyCollection<string> SecretFields { get; }
 
-        /// <summary>Checks settings before they are saved; returns an error message or null.</summary>
-        string Validate(JsonObject config);
+        /// <summary>
+        /// Checks settings before they are saved or tested: an error message per settings field (the key in
+        /// <paramref name="config"/>), empty when they are valid. The integration page shows each under its field.
+        /// </summary>
+        IReadOnlyDictionary<string, string> Validate(JsonObject config);
 
         /// <summary>
         /// Runs the action. Throwing counts as a temporary failure (retried if the integration allows it);
@@ -55,6 +58,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         [Parameter] public EventCallback ConfigChanged { get; set; }
 
+        /// <summary>Errors to show now, keyed by settings field; the page decides when a field's error shows.</summary>
+        [Parameter] public IReadOnlyDictionary<string, string> Errors { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>Tell the page a field was left, so its error can show (call from onblur).</summary>
+        [Parameter] public EventCallback<string> FieldTouched { get; set; }
+
         protected string GetString(string field) =>
             Config.TryGetPropertyValue(field, out var node) && node is JsonValue value &&
             value.TryGetValue<string>(out var text)
@@ -73,6 +82,20 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 : placeholder;
 
         protected Task NotifyChanged() => ConfigChanged.InvokeAsync();
+
+        /// <summary>The error to show for a settings field, or null.</summary>
+        protected string ErrorFor(string field) => Errors.TryGetValue(field, out var error) ? error : null;
+
+        /// <summary>The id of a field's error element, for aria-describedby.</summary>
+        protected static string ErrorId(string field) => "config-" + field + "-error";
+
+        /// <summary>aria-invalid for a settings field.</summary>
+        protected string Invalid(string field) => ErrorFor(field) == null ? null : "true";
+
+        /// <summary>aria-describedby for a settings field.</summary>
+        protected string DescribedBy(string field) => ErrorFor(field) == null ? null : ErrorId(field);
+
+        protected Task Touch(string field) => FieldTouched.InvokeAsync(field);
     }
 
     public static class ActionConfigExtensions

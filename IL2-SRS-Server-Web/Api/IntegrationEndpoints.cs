@@ -84,7 +84,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
         private static IResult Save(long id, IntegrationRequest request, IntegrationDefinition existing,
             IntegrationService service, ClaimsPrincipal user)
         {
-            var error = service.Save(ToDefinition(id, request, existing), Actor(user), out var saved);
+            var definition = ToDefinition(id, request, existing);
+            var validation = service.Validate(definition);
+            if (!validation.IsValid)
+            {
+                return Results.BadRequest(new ValidationErrorResponse(validation.FirstError, validation.Errors));
+            }
+
+            var error = service.Save(definition, Actor(user), out var saved);
             return error == null
                 ? id == 0 ? Results.Created($"/api/v1/integrations/{saved.Id}", ToResponse(saved)) : Results.Ok(ToResponse(saved))
                 : Results.BadRequest(new ErrorResponse(error));

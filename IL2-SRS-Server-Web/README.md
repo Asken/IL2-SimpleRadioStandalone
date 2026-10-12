@@ -182,7 +182,7 @@ other keys.
 | `GET /api/v1/event-types` | read | Event types and their payload fields |
 | `DELETE /api/v1/events` | write | Clear the event log |
 | `GET /api/v1/integrations`, `GET /api/v1/integrations/{id}` | read | Integrations (secret settings are never returned) |
-| `POST /api/v1/integrations`, `PUT`, `DELETE /api/v1/integrations/{id}` | write | Create, replace or delete an integration |
+| `POST /api/v1/integrations`, `PUT`, `DELETE /api/v1/integrations/{id}` | write | Create, replace or delete an integration; a 400 lists every problem in `errors`, keyed by field (`name`, `config.webhookUrl`, …) |
 | `POST /api/v1/integrations/test` | write | Run an integration's action once with example data, without saving it |
 | `GET /api/v1/integrations/action-types` | read | Actions an integration can run |
 | `GET /api/v1/integrations/runs?status=&integration=&limit=` | read | Integration runs, newest first |

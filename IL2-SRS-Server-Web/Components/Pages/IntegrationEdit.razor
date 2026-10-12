@@ -2,9 +2,11 @@
 @page "/integrations/{Id:long}"
 @attribute [Authorize]
 @using System.Text.Json.Nodes
+@using Microsoft.JSInterop
 @inject IntegrationService Integrations
 @inject AdminAuthOptions AuthOptions
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>@(Id.HasValue ? "Edit integration" : "New integration") · IL2-SRS Server</PageTitle>
 
@@ -18,12 +20,20 @@
     return;
 }
 
-<form class="panel integration-form" @onsubmit="Save">
+@{
+    // Checked on every render so errors follow the edits; FormState decides which ones show.
+    _validation = Integrations.Validate(Draft());
+}
+
+<form class="panel integration-form" novalidate @onsubmit="Save">
     <p class="muted">Run an action when an event happens, optionally only when the event data matches conditions.</p>
 
     <div class="field">
         <label for="name">Name</label>
-        <input id="name" type="text" maxlength="100" placeholder="e.g. Post joins to Discord" @bind="_name" />
+        <input id="name" type="text" maxlength="100" placeholder="e.g. Post joins to Discord"
+               aria-invalid="@Invalid(IntegrationValidation.Name)" aria-describedby="@DescribedBy(IntegrationValidation.Name)"
+               @bind="_name" @bind:event="oninput" @onblur="() => _form.Touch(IntegrationValidation.Name)" />
+        <FieldError Id="@ErrorId(IntegrationValidation.Name)" Message="@Show(IntegrationValidation.Name)" />
     </div>
 
     <div class="field">
@@ -42,7 +52,9 @@
 
     <div class="field">
         <label for="trigger">Trigger event</label>
-        <select id="trigger" @bind="_triggerType" @bind:after="TriggerChanged">
+        <select id="trigger" aria-invalid="@Invalid(IntegrationValidation.Trigger)"
+                aria-describedby="@DescribedBy(IntegrationValidation.Trigger)"
+                @bind="_triggerType" @bind:after="TriggerChanged" @onblur="() => _form.Touch(IntegrationValidation.Trigger)">
             <option value="">Choose an event</option>
             @foreach (var category in EventCategory.All)
             {
@@ -54,6 +66,7 @@
                 </optgroup>
             }
         </select>
+        <FieldError Id="@ErrorId(IntegrationValidation.Trigger)" Message="@Show(IntegrationValidation.Trigger)" />
         @if (Trigger != null)
         {
             <span class="field-help">@Trigger.Description</span>
@@ -77,9 +90,11 @@
         <span class="field-help">
             Optional. All conditions must match the event data for the action to run. Text comparisons ignore case.
         </span>
-        @foreach (var condition in _conditions)
+        @foreach (var (condition, index) in _conditions.Select((c, i) => (c, i)))
         {
-            <div class="condition-row" @key="condition">
+            var valueKey = IntegrationValidation.Condition(index, "value");
+            <div class="condition" @key="condition">
+            <div class="condition-row">
                 <select aria-label="Field" @bind="condition.Field" disabled="@(Trigger == null)">
                     <option value="">Field</option>
                     @foreach (var field in EventData.Fields(Trigger))
@@ -95,7 +110,9 @@
                 </select>
                 @if (ConditionOperator.NeedsValue(condition.Operator))
                 {
-                    <input type="text" aria-label="Value" placeholder="value" @bind="condition.Value" />
+                    <input type="text" aria-label="Value" placeholder="value"
+                           aria-invalid="@Invalid(valueKey)" aria-describedby="@DescribedBy(valueKey)"
+                           @bind="condition.Value" @bind:event="oninput" @onblur="() => _form.Touch(valueKey)" />
                 }
                 else
                 {
@@ -106,6 +123,8 @@
                     <Icon Name="x" />
                 </button>
             </div>
+            <FieldError Id="@ErrorId(valueKey)" Message="@Show(valueKey)" />
+            </div>
         }
         <div>
             <button type="button" class="btn btn-quiet" @onclick="() => _conditions.Add(new ConditionRow())">+ Add condition</button>
@@ -114,13 +133,16 @@
 
     <div class="field">
         <label for="action">Action</label>
-        <select id="action" @bind="_actionType" @bind:after="ActionChanged">
+        <select id="action" aria-invalid="@Invalid(IntegrationValidation.Action)"
+                aria-describedby="@DescribedBy(IntegrationValidation.Action)"
+                @bind="_actionType" @bind:after="ActionChanged" @onblur="() => _form.Touch(IntegrationValidation.Action)">
             <option value="">Choose an action</option>
             @foreach (var available in Integrations.Actions)
             {
                 <option value="@available.Type">@available.Label</option>
             }
         </select>
+        <FieldError Id="@ErrorId(IntegrationValidation.Action)" Message="@Show(IntegrationValidation.Action)" />
         @if (Action != null)
         {
             <span class="field-help">@Action.Description</span>
@@ -150,7 +172,11 @@
         <div class="field">
             <label for="maxRetries">Max retries</label>
             <input id="maxRetries" type="number" class="input-narrow" min="1" max="@IntegrationDefinition.MaxRetriesLimit"
-                   disabled="@(_retryMode == RetryMode.None)" @bind="_maxRetries" />
+                   aria-invalid="@Invalid(IntegrationValidation.MaxRetries)"
+                   aria-describedby="@DescribedBy(IntegrationValidation.MaxRetries)"
+                   disabled="@(_retryMode == RetryMode.None)" @bind="_maxRetries"
+                   @onblur="() => _form.Touch(IntegrationValidation.MaxRetries)" />
+            <FieldError Id="@ErrorId(IntegrationValidation.MaxRetries)" Message="@Show(IntegrationValidation.MaxRetries)" />
         </div>
     </div>
 
@@ -207,6 +233,9 @@
     private string _error;
     private IntegrationTestResult _test;
     private bool _testing;
+    private readonly FormState _form = new();
+    private IntegrationValidation _validation;
+    private bool _focusFirstError;
 
     private SrsEventType Trigger => SrsEventTypes.Find(_triggerType);
     private IIntegrationAction Action => Integrations.FindAction(_actionType);
@@ -217,8 +246,52 @@
         [nameof(IntegrationActionEditor.Config)] = _config,
         [nameof(IntegrationActionEditor.SecretHints)] = _hints,
         [nameof(IntegrationActionEditor.Trigger)] = Trigger,
-        [nameof(IntegrationActionEditor.ConfigChanged)] = EventCallback.Factory.Create(this, () => _test = null)
+        [nameof(IntegrationActionEditor.ConfigChanged)] = EventCallback.Factory.Create(this, () => _test = null),
+        [nameof(IntegrationActionEditor.Errors)] = ConfigErrors(),
+        [nameof(IntegrationActionEditor.FieldTouched)] = EventCallback.Factory.Create<string>(this,
+            name => _form.Touch(IntegrationValidation.Config(name)))
     };
+
+    /// <summary>The error to show for a field now, or null.</summary>
+    private string Show(string key) =>
+        _validation != null && _validation.Errors.TryGetValue(key, out var error) ? _form.Show(key, error) : null;
+
+    private string Invalid(string key) => FieldError.Invalid(Show(key));
+    private string DescribedBy(string key) => FieldError.DescribedBy(ErrorId(key), Show(key));
+    private static string ErrorId(string key) => key.Replace('[', '-').Replace("]", "").Replace('.', '-') + "-error";
+
+    /// <summary>The action settings' errors to show, keyed by settings field for the editor.</summary>
+    private Dictionary<string, string> ConfigErrors()
+    {
+        var prefix = IntegrationValidation.Config(string.Empty);
+        return (_validation?.Errors ?? new Dictionary<string, string>())
+            .Where(e => e.Key.StartsWith(prefix, StringComparison.Ordinal) && Show(e.Key) != null)
+            .ToDictionary(e => e.Key[prefix.Length..], e => e.Value);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusFirstError)
+        {
+            _focusFirstError = false;
+            await JS.InvokeVoidAsync("il2srs.focusFirstInvalid");
+        }
+    }
+
+    /// <summary>Shows every error after Save or Test; returns false (and moves to the first error) when invalid.</summary>
+    private bool CheckBeforeSubmit()
+    {
+        _form.Submit();
+        _validation = Integrations.Validate(Draft());
+        if (_validation.IsValid)
+        {
+            return true;
+        }
+
+        _test = null;
+        _focusFirstError = true;
+        return false;
+    }
 
     protected override void OnParametersSet()
     {
@@ -289,8 +362,8 @@
         Description = _description,
         Enabled = _enabled,
         TriggerType = _triggerType,
+        // Every row, so errors line up with the rows; rows without a field are dropped when saving.
         Conditions = _conditions
-            .Where(c => !string.IsNullOrWhiteSpace(c.Field))
             .Select(c => new IntegrationCondition(c.Field, c.Operator,
                 ConditionOperator.NeedsValue(c.Operator) ? c.Value?.Trim() : null))
             .ToList(),
@@ -303,6 +376,12 @@
     private void Save()
     {
         _test = null;
+        _error = null;
+        if (!CheckBeforeSubmit())
+        {
+            return;
+        }
+
         _error = Integrations.Save(Draft(), Actor, out _);
         if (_error == null)
         {
@@ -314,6 +393,11 @@
     {
         _error = null;
         _test = null;
+        if (!CheckBeforeSubmit())
+        {
+            return;
+        }
+
         _testing = true;
         try
         {

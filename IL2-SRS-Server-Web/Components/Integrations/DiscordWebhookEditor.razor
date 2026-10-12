@@ -7,7 +7,11 @@
     <input id="discord-url" type="password" autocomplete="off" spellcheck="false"
            placeholder="@SecretPlaceholder(DiscordWebhookAction.WebhookUrlField, "https://discord.com/api/webhooks/…")"
            value="@GetString(DiscordWebhookAction.WebhookUrlField)"
-           @onchange="e => SetString(DiscordWebhookAction.WebhookUrlField, e.Value?.ToString()?.Trim())" />
+           @onchange="e => SetString(DiscordWebhookAction.WebhookUrlField, e.Value?.ToString()?.Trim())"
+           aria-invalid="@Invalid(DiscordWebhookAction.WebhookUrlField)"
+           aria-describedby="@DescribedBy(DiscordWebhookAction.WebhookUrlField)"
+           @onblur="() => Touch(DiscordWebhookAction.WebhookUrlField)" />
+    <FieldError Id="@ErrorId(DiscordWebhookAction.WebhookUrlField)" Message="@ErrorFor(DiscordWebhookAction.WebhookUrlField)" />
     <span class="field-help">In Discord: channel settings → Integrations → Webhooks → Copy Webhook URL. Stored encrypted.</span>
 </div>
 
@@ -23,7 +27,11 @@
         <label for="discord-username">Bot name</label>
         <input id="discord-username" type="text" maxlength="80" placeholder="The name set on the webhook"
                value="@GetString(DiscordWebhookAction.UsernameField)"
-               @onchange="e => SetString(DiscordWebhookAction.UsernameField, e.Value?.ToString()?.Trim())" />
+               @onchange="e => SetString(DiscordWebhookAction.UsernameField, e.Value?.ToString()?.Trim())"
+               aria-invalid="@Invalid(DiscordWebhookAction.UsernameField)"
+               aria-describedby="@DescribedBy(DiscordWebhookAction.UsernameField)"
+               @onblur="() => Touch(DiscordWebhookAction.UsernameField)" />
+        <FieldError Id="@ErrorId(DiscordWebhookAction.UsernameField)" Message="@ErrorFor(DiscordWebhookAction.UsernameField)" />
     </div>
 </div>
 
@@ -34,13 +42,21 @@
             <label for="discord-title">Title</label>
             <input id="discord-title" type="text" spellcheck="false" placeholder="@DiscordWebhookAction.DefaultTitle"
                    value="@GetString(DiscordWebhookAction.TitleField)"
-                   @oninput="e => SetString(DiscordWebhookAction.TitleField, e.Value?.ToString())" />
+                   @oninput="e => SetString(DiscordWebhookAction.TitleField, e.Value?.ToString())"
+                   aria-invalid="@Invalid(DiscordWebhookAction.TitleField)"
+                   aria-describedby="@DescribedBy(DiscordWebhookAction.TitleField)"
+                   @onblur="() => Touch(DiscordWebhookAction.TitleField)" />
+            <FieldError Id="@ErrorId(DiscordWebhookAction.TitleField)" Message="@ErrorFor(DiscordWebhookAction.TitleField)" />
         </div>
         <div class="field">
             <label for="discord-color">Colour</label>
             <input id="discord-color" type="color" class="input-color"
                    value="@(GetString(DiscordWebhookAction.ColorField) ?? DiscordWebhookAction.DefaultColor)"
-                   @onchange="e => SetString(DiscordWebhookAction.ColorField, e.Value?.ToString())" />
+                   @onchange="e => SetString(DiscordWebhookAction.ColorField, e.Value?.ToString())"
+                   aria-invalid="@Invalid(DiscordWebhookAction.ColorField)"
+                   aria-describedby="@DescribedBy(DiscordWebhookAction.ColorField)"
+                   @onblur="() => Touch(DiscordWebhookAction.ColorField)" />
+            <FieldError Id="@ErrorId(DiscordWebhookAction.ColorField)" Message="@ErrorFor(DiscordWebhookAction.ColorField)" />
         </div>
     </div>
 }
@@ -49,7 +65,11 @@
     <label for="discord-content">Message</label>
     <textarea id="discord-content" rows="4" spellcheck="false" placeholder="@DiscordWebhookAction.DefaultContent"
               value="@GetString(DiscordWebhookAction.ContentField)"
-              @oninput="e => SetString(DiscordWebhookAction.ContentField, e.Value?.ToString())"></textarea>
+              @oninput="e => SetString(DiscordWebhookAction.ContentField, e.Value?.ToString())"
+              aria-invalid="@Invalid(DiscordWebhookAction.ContentField)"
+              aria-describedby="@DescribedBy(DiscordWebhookAction.ContentField)"
+              @onblur="() => Touch(DiscordWebhookAction.ContentField)"></textarea>
+    <FieldError Id="@ErrorId(DiscordWebhookAction.ContentField)" Message="@ErrorFor(DiscordWebhookAction.ContentField)" />
     <TemplateHelp Escaping="Values from the event are escaped, so player names cannot add formatting or links, and the message never mentions anyone." />
 </div>
 

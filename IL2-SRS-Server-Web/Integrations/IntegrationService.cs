@@ -14,6 +14,33 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     public sealed record IntegrationTestResult(IntegrationResult Result, bool ConditionsMatchSample);
 
     /// <summary>
+    /// What is wrong with an integration, keyed by field in the order of the form: <c>name</c>, <c>trigger</c>,
+    /// <c>conditions[0].value</c>, <c>action</c>, <c>config.webhookUrl</c>, <c>maxRetries</c>.
+    /// </summary>
+    public sealed class IntegrationValidation
+    {
+        public const string Name = "name";
+        public const string Trigger = "trigger";
+        public const string Action = "action";
+        public const string MaxRetries = "maxRetries";
+
+        public IntegrationValidation(IReadOnlyDictionary<string, string> errors)
+        {
+            Errors = errors;
+        }
+
+        public IReadOnlyDictionary<string, string> Errors { get; }
+        public bool IsValid => Errors.Count == 0;
+
+        /// <summary>The first error, where only one message is shown (the API's <c>error</c>).</summary>
+        public string FirstError => Errors.Values.FirstOrDefault();
+
+        public static string Condition(int index, string part) => $"conditions[{index}].{part}";
+
+        public static string Config(string field) => "config." + field;
+    }
+
+    /// <summary>
     /// What the admin UI and the API use to manage integrations: validation, saving (recorded in the event log)
     /// and test runs with example event data.
     /// </summary>
@@ -40,59 +67,112 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public IIntegrationAction FindAction(string type) =>
             type != null && _actions.TryGetValue(type, out var action) ? action : null;
 
-        /// <summary>Checks an integration before saving; returns an error message or null.</summary>
-        public string Validate(IntegrationDefinition draft)
+        /// <summary>Checks an integration before saving or testing it.</summary>
+        public IntegrationValidation Validate(IntegrationDefinition draft)
         {
+            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+
             if (string.IsNullOrWhiteSpace(draft.Name))
             {
-                return "Enter a name.";
+                errors[IntegrationValidation.Name] = "Enter a name.";
             }
-
-            if (draft.Name.Trim().Length > 100)
+            else if (draft.Name.Trim().Length > 100)
             {
-                return "The name can be at most 100 characters.";
+                errors[IntegrationValidation.Name] = "The name can be at most 100 characters.";
             }
 
             if (SrsEventTypes.Find(draft.TriggerType) == null)
             {
-                return "Choose a trigger event.";
+                errors[IntegrationValidation.Trigger] = "Choose the event that runs this integration.";
+            }
+
+            for (var i = 0; i < draft.Conditions.Count; i++)
+            {
+                var condition = draft.Conditions[i];
+                if (string.IsNullOrWhiteSpace(condition.Field))
+                {
+                    continue;
+                }
+
+                if (ConditionOperator.All.All(o => o.Value != condition.Operator))
+                {
+                    errors[IntegrationValidation.Condition(i, "operator")] = "Choose a comparison.";
+                }
+                else if (ConditionError(condition) is { } valueError)
+                {
+                    errors[IntegrationValidation.Condition(i, "value")] = valueError;
+                }
             }
 
             var action = FindAction(draft.ActionType);
             if (action == null)
             {
-                return "Choose an action.";
+                errors[IntegrationValidation.Action] = "Choose what to do when the event happens.";
             }
-
-            foreach (var condition in draft.Conditions.Where(c => !string.IsNullOrWhiteSpace(c.Field)))
+            else
             {
-                if (ConditionOperator.All.All(o => o.Value != condition.Operator))
+                foreach (var (field, error) in action.Validate(WithStoredSecrets(draft)))
                 {
-                    return $"Choose a valid comparison for {condition.Field}.";
+                    errors[IntegrationValidation.Config(field)] = error;
                 }
             }
 
             if (draft.RetryMode != RetryMode.None &&
                 (draft.MaxRetries < 1 || draft.MaxRetries > IntegrationDefinition.MaxRetriesLimit))
             {
-                return $"Max retries must be between 1 and {IntegrationDefinition.MaxRetriesLimit}.";
+                errors[IntegrationValidation.MaxRetries] =
+                    $"Enter a number from 1 to {IntegrationDefinition.MaxRetriesLimit}.";
             }
 
-            return action.Validate(WithStoredSecrets(draft));
+            return new IntegrationValidation(errors);
+        }
+
+        /// <summary>A condition's value that can never match as intended, e.g. "greater than abc".</summary>
+        private static string ConditionError(IntegrationCondition condition)
+        {
+            var value = condition.Value?.Trim();
+            switch (condition.Operator)
+            {
+                case ConditionOperator.GreaterThan:
+                case ConditionOperator.LessThan:
+                    return double.TryParse(value, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out _)
+                        ? null
+                        : "Enter a number.";
+                case ConditionOperator.Contains:
+                case ConditionOperator.NotContains:
+                case ConditionOperator.In:
+                    return string.IsNullOrEmpty(value) ? "Enter a value." : null;
+                default:
+                    return null;
+            }
         }
 
         /// <summary>Creates or updates an integration; returns an error message or null.</summary>
         public string Save(IntegrationDefinition draft, string actor, out IntegrationDefinition saved)
         {
             saved = null;
-            var error = Validate(draft);
-            if (error != null)
+            var validation = Validate(draft);
+            if (!validation.IsValid)
             {
-                return error;
+                return validation.FirstError;
             }
 
             var created = draft.Id == 0;
-            saved = Store.Save(draft);
+            saved = Store.Save(new IntegrationDefinition
+            {
+                Id = draft.Id,
+                Name = draft.Name.Trim(),
+                Description = draft.Description,
+                Enabled = draft.Enabled,
+                TriggerType = draft.TriggerType,
+                // Rows without a field are unfinished rows on the form.
+                Conditions = draft.Conditions.Where(c => !string.IsNullOrWhiteSpace(c.Field)).ToList(),
+                ActionType = draft.ActionType,
+                ActionConfig = draft.ActionConfig,
+                RetryMode = draft.RetryMode,
+                MaxRetries = draft.MaxRetries
+            });
             if (saved == null)
             {
                 return "The integration no longer exists.";
@@ -131,10 +211,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>Runs the action once with example data for the trigger event, without saving or queueing.</summary>
         public async Task<IntegrationTestResult> TestAsync(IntegrationDefinition draft, CancellationToken cancellationToken)
         {
-            var error = Validate(draft);
-            if (error != null)
+            var validation = Validate(draft);
+            if (!validation.IsValid)
             {
-                return new IntegrationTestResult(IntegrationResult.Fail(error), false);
+                return new IntegrationTestResult(IntegrationResult.Fail(validation.FirstError), false);
             }
 
             var trigger = SrsEventTypes.Find(draft.TriggerType);

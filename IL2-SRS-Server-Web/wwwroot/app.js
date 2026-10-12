@@ -93,3 +93,13 @@
         });
     }
 })();
+
+// Forms: after a submit with errors, move to the first field marked invalid (Blazor calls this).
+window.il2srs = window.il2srs || {};
+window.il2srs.focusFirstInvalid = function (container) {
+    var field = (container || document).querySelector('[aria-invalid="true"]');
+    if (field) {
+        field.focus();
+        field.scrollIntoView({ block: 'center' });
+    }
+};
