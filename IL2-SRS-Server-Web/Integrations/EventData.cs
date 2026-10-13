@@ -18,25 +18,61 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
     public static class EventData
     {
-        public static JsonElement From(SrsEvent srsEvent)
+        /// <param name="server">The server's identity (<see cref="Admin.ServerIdentity.Section"/>), added to <c>server.*</c>.</param>
+        public static JsonElement From(SrsEvent srsEvent, JsonObject server = null)
         {
             var data = JsonNode.Parse(srsEvent.Payload.GetRawText()) as JsonObject ?? new JsonObject();
+            AddServer(data, server);
             data["event"] = EventSection(srsEvent.EventType, srsEvent.Actor, srsEvent.Message, srsEvent.OccurredAtUtc);
             return JsonSerializer.SerializeToElement(data);
         }
 
-        /// <summary>Example data for an event type, built from its fields' example values.</summary>
-        public static JsonElement Sample(SrsEventType type)
+        /// <summary>
+        /// Example data for an event type, built from its fields' example values; <paramref name="server"/>
+        /// replaces the example server identity with the real one.
+        /// </summary>
+        public static JsonElement Sample(SrsEventType type, JsonObject server = null)
         {
             var data = new JsonObject();
-            foreach (var field in type.Fields)
+            foreach (var field in Fields(type))
             {
                 Set(data, field.Path, JsonSerializer.SerializeToNode(field.Example ?? DefaultExample(field)));
+            }
+
+            if (server != null)
+            {
+                foreach (var entry in server)
+                {
+                    ((JsonObject)data["server"])[entry.Key] = entry.Value?.DeepClone();
+                }
             }
 
             data["event"] = EventSection(type, "system", $"Example {type.Label.ToLowerInvariant()} event",
                 new DateTime(2026, 10, 12, 18, 0, 0, DateTimeKind.Utc));
             return JsonSerializer.SerializeToElement(data);
+        }
+
+        /// <summary>Adds the server identity to the payload's <c>server</c> section, keeping what the event set.</summary>
+        private static void AddServer(JsonObject data, JsonObject server)
+        {
+            if (server == null)
+            {
+                return;
+            }
+
+            if (data["server"] is not JsonObject section)
+            {
+                section = new JsonObject();
+                data["server"] = section;
+            }
+
+            foreach (var entry in server)
+            {
+                if (!section.ContainsKey(entry.Key))
+                {
+                    section[entry.Key] = entry.Value?.DeepClone();
+                }
+            }
         }
 
         /// <summary>Every field path an integration on this event can use: <c>event.*</c> and the payload fields.</summary>

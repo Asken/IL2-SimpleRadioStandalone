@@ -403,9 +403,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 trigger: "server.started,server.stopped"), "admin", out var saved));
             Assert.Equal(new[] { "server.started", "server.stopped" }, service.Store.Get(saved.Id).TriggerTypes);
 
-            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStarted, "system", "started", EventPayload.Server(6002, 0)));
+            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStarted, "system", "started", EventPayload.Server(6002, 0, null)));
             dispatcher.Match(Connected());
-            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStopped, "admin", "stopped", EventPayload.Server(6002, 3)));
+            dispatcher.Match(SrsEvent.Create(SrsEventTypes.ServerStopped, "admin", "stopped", EventPayload.Server(6002, 3, null)));
 
             Assert.Equal(new[] { "server.stopped", "server.started" },
                 service.Store.QueryExecutions().Select(r => r.EventType));

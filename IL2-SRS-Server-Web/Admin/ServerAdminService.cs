@@ -376,7 +376,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         private JsonObject ServerPayload()
         {
-            return EventPayload.Server(Port, _serverState.GetClients().Count);
+            return EventPayload.Server(Port, _serverState.GetClients().Count, _serverState.StartedAtUtc);
         }
 
         private static JsonObject ApiKeyPayload(ApiKeyRecord key)

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
@@ -30,6 +31,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         private readonly IntegrationStore _store;
         private readonly AuditRetention _retention;
+        private readonly ServerIdentity _identity;
         private readonly Dictionary<string, IIntegrationAction> _actions;
         private readonly Channel<SrsEvent> _incoming = Channel.CreateBounded<SrsEvent>(
             new BoundedChannelOptions(10_000) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
@@ -41,10 +43,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         private int _droppedEvents;
 
         public IntegrationDispatcher(IntegrationStore store, ServerEvents events, IEnumerable<IIntegrationAction> actions,
-            AuditRetention retention)
+            AuditRetention retention, ServerIdentity identity = null)
         {
             _store = store;
             _retention = retention;
+            _identity = identity;
             _actions = actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
             events.EventPublished += OnEventPublished;
             store.IntegrationsChanged += () => _integrations = null;
@@ -84,7 +87,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     continue;
                 }
 
-                data ??= EventData.From(srsEvent);
+                data ??= EventData.From(srsEvent, _identity?.Section());
                 if (EventData.Matches(data.Value, integration.Conditions))
                 {
                     _store.Enqueue(integration, srsEvent.Type, srsEvent.Message, data.Value);

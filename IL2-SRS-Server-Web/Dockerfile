@@ -43,6 +43,7 @@ LABEL org.opencontainers.image.title="IL2-SRS Server" \
       org.opencontainers.image.base.digest="sha256:f62a272ac1b46e83f56b8ed0416572f31cd1128e2c4a5e63eb34d348e4a36095"
 
 ENV SRS_DATA_DIR=/data \
+    SRS_IMAGE_VERSION=$VERSION \
     ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_gcServer=0
 

@@ -53,7 +53,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
         private static readonly SrsEventField[] ServerFields =
         {
             new("server.port", "number", "SRS port", 6002),
-            new("server.clientCount", "number", "Connected clients", 12)
+            new("server.clientCount", "number", "Connected clients", 12),
+            new("server.uptime", "number",
+                "Seconds the server had been running (0 when it starts); " +
+                "{{ timespan.from_seconds server.uptime }} shows it as 03:12:40", 11560)
         };
 
         private static readonly SrsEventField[] BanFields =
@@ -96,7 +99,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             new("event.category", "string", "server, client, radio, admin or auth"),
             new("event.actor", "string", "Who caused it: system, admin, api:<key name> or anonymous", "system"),
             new("event.message", "string", "The event log message"),
-            new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z")
+            new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z"),
+            new("server.name", "string", "Server Name setting, or the host name when it isn't set", "Combat Box"),
+            new("server.hostname", "string",
+                "Host name; in Docker the container ID unless the stack sets hostname", "srs-1"),
+            new("server.version", "string", "Server version, e.g. the image version", "1.0.5.0-preview"),
+            new("server.adminUrl", "string", "Public Admin URL setting, when set", "https://srs.example.com")
         };
 
         public static readonly SrsEventType ServerStarted = new("server.started", EventCategory.Server,

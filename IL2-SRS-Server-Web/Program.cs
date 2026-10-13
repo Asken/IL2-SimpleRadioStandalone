@@ -138,6 +138,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());
             builder.Services.AddHostedService<SrsServerHostedService>();
             builder.Services.AddSingleton<SecretProtector>();
+            builder.Services.AddSingleton<ServerIdentity>();
             builder.Services.AddSingleton<IntegrationStore>();
             builder.Services.AddSingleton<IntegrationService>();
             builder.Services.AddSingleton<IntegrationDispatcher>();

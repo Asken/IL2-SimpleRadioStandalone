@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 
@@ -55,12 +56,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public static readonly TimeSpan ActionTimeout = TimeSpan.FromSeconds(30);
 
         private readonly ServerEvents _events;
+        private readonly ServerIdentity _identity;
         private readonly Dictionary<string, IIntegrationAction> _actions;
 
-        public IntegrationService(IntegrationStore store, ServerEvents events, IEnumerable<IIntegrationAction> actions)
+        public IntegrationService(IntegrationStore store, ServerEvents events, IEnumerable<IIntegrationAction> actions,
+            ServerIdentity identity = null)
         {
             Store = store;
             _events = events;
+            _identity = identity;
             Actions = actions.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase).ToList();
             _actions = Actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
         }
@@ -237,7 +241,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             var runs = new List<IntegrationTestRun>();
             foreach (var trigger in draft.Triggers.Distinct())
             {
-                var data = EventData.Sample(trigger);
+                // Example event data, but this server's real name, version and address.
+                var data = EventData.Sample(trigger, _identity?.Section());
                 var context = new IntegrationExecutionContext
                 {
                     Integration = draft,

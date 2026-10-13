@@ -26,7 +26,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting
         {
             _serverState.Start();
             _events.Publish(SrsEventTypes.ServerStarted, "system", $"Server started on port {_serverState.Port}",
-                EventPayload.Server(_serverState.Port, 0));
+                EventPayload.Server(_serverState.Port, 0, _serverState.StartedAtUtc));
             return Task.CompletedTask;
         }
 
@@ -34,7 +34,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting
         {
             if (_serverState.IsRunning)
             {
-                var payload = EventPayload.Server(_serverState.Port, _serverState.GetClients().Count);
+                var payload = EventPayload.Server(_serverState.Port, _serverState.GetClients().Count,
+                    _serverState.StartedAtUtc);
                 _serverState.Stop();
                 _events.Publish(SrsEventTypes.ServerStopped, "system", "Server shut down", payload);
             }

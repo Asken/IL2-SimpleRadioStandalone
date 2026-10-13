@@ -66,7 +66,8 @@ Server setting names are those of `server.cfg` (`SERVER_PORT`, `COALITION_AUDIO_
 `SPECTATORS_AUDIO_DISABLED`, `IRL_RADIO_TX`, `RADIO_COLLISION_EFFECTS`, `SECOND_RADIO_ENABLED`,
 `CHANNEL_LIMIT`, `GLOBAL_LOBBY_FREQUENCIES`, `PRIORITY_TRANSMITTER_NAMES`, `SHOW_TUNED_COUNT`,
 `SHOW_TRANSMITTER_NAME`, `SHOW_SQUAD_CHANNEL_LABELS`, `CLIENT_EXPORT_ENABLED`, `CLIENT_EXPORT_FILE_PATH`,
-`ASSIGNED_CALLSIGNS_JSON_FILE`). Relative file paths are inside the data directory.
+`ASSIGNED_CALLSIGNS_JSON_FILE`), plus `SERVER_NAME` and `PUBLIC_ADMIN_URL` for integration messages.
+Relative file paths are inside the data directory.
 
 ## Docker
 
@@ -206,6 +207,11 @@ over the event data shown on the integration page, with a live preview:
 ```
 {{ client.name }} joined {{ client.coalitionName }}{{ if client.coalition == 1 }} 🔴{{ end }}
 ```
+
+Every event also has `server.name` (the **Server Name** setting, or the host name), `server.hostname`,
+`server.version` and `server.adminUrl` (the **Public Admin URL** setting). In Docker the host name is the container
+ID unless the stack sets `hostname:`. Server events add `server.uptime` in seconds;
+`{{ timespan.from_seconds server.uptime }}` shows it as `03:12:40`.
 
 With several trigger events, `event.type` tells them apart:
 

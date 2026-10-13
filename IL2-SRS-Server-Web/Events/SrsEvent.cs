@@ -89,11 +89,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             };
         }
 
-        public static JsonObject Server(int port, int clientCount)
+        /// <summary>The <c>server</c> section of server events; <paramref name="startedAtUtc"/> is null when stopped.</summary>
+        public static JsonObject Server(int port, int clientCount, DateTime? startedAtUtc)
         {
+            var uptime = startedAtUtc == null
+                ? 0
+                : (long)Math.Max(0, (DateTime.UtcNow - startedAtUtc.Value).TotalSeconds);
             return new JsonObject
             {
-                ["server"] = new JsonObject { ["port"] = port, ["clientCount"] = clientCount }
+                ["server"] = new JsonObject { ["port"] = port, ["clientCount"] = clientCount, ["uptime"] = uptime }
             };
         }
 
