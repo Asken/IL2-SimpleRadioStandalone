@@ -36,6 +36,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>Each event edits the same message (e.g. a server status), posting a new one if it is gone.</summary>
         public const string ModeUpdate = "update";
 
+        /// <summary>The <see cref="DescribeState"/> entry with the ID of the message being kept updated.</summary>
+        public const string MessageIdState = "messageId";
+
+        /// <summary>The <see cref="DescribeState"/> entry with the message's link in Discord, when known.</summary>
+        public const string MessageLinkState = "messageLink";
+
+        /// <summary>The <see cref="DescribeState"/> entry with when the message was last posted or edited (UTC, ISO 8601).</summary>
+        public const string MessageUpdatedState = "messageUpdatedAt";
+
+        private const string LinkSuffix = ".link";
+        private const string UpdatedSuffix = ".updatedAt";
+
         /// <summary>Integration state key prefix for the message ID, followed by a hash of the webhook URL.</summary>
         private const string MessageStatePrefix = "discord.message.";
         public const string DefaultContent = "{{ event.message }}";
@@ -145,9 +157,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             var stateKey = MessageStatePrefix + Hash(url);
             if (keepUpdated && context.State.Get(stateKey) is { } messageId)
             {
-                // Webhook message edits can't change the bot name.
+                // Webhook message edits can't change the bot name. Fields left out keep their value, so clear the
+                // text or embeds of the other style in case the style changed.
                 var edit = (JsonObject)message.DeepClone();
                 edit.Remove(UsernameField);
+                edit["content"] ??= string.Empty;
+                edit["embeds"] ??= new JsonArray();
                 using var request = new HttpRequestMessage(HttpMethod.Patch, MessageUrl(url, messageId))
                 {
                     Content = JsonContent.Create(edit)
@@ -155,7 +170,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 using var edited = await client.SendAsync(request, cancellationToken);
                 if (edited.IsSuccessStatusCode)
                 {
-                    return IntegrationResult.Success("Updated the Discord message.");
+                    context.State.Set(stateKey + UpdatedSuffix, Now());
+                    return IntegrationResult.Success($"Updated Discord message {messageId}.");
                 }
 
                 if (edited.StatusCode != HttpStatusCode.NotFound)
@@ -165,6 +181,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
                 // The message was deleted in Discord: post a new one below and keep that updated instead.
                 context.State.Remove(stateKey);
+                context.State.Remove(stateKey + LinkSuffix);
+                context.State.Remove(stateKey + UpdatedSuffix);
             }
 
             using var response = await client.PostAsJsonAsync(WithWait(url), message, cancellationToken);
@@ -173,22 +191,45 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 return await FailureAsync(response, cancellationToken);
             }
 
+            var (postedId, channelId) = await PostedMessageAsync(response, cancellationToken);
+            var posted = postedId == null ? "Discord accepted the message" : $"Posted Discord message {postedId}";
             if (!keepUpdated)
             {
                 return IntegrationResult.Success(context.IsTest && context.Config.GetText(MessageModeField) == ModeUpdate
-                    ? "Discord accepted the test message. Tests post a new message and leave the updated one alone."
-                    : "Discord accepted the message.");
+                    ? posted + ". Tests post a new message and leave the updated one alone."
+                    : posted + ".");
             }
 
-            if (await MessageIdAsync(response, cancellationToken) is not { } postedId)
+            if (postedId == null)
             {
-                return IntegrationResult.Success("Discord accepted the message but didn't return its ID, " +
-                                                  "so the next event posts a new one.");
+                return IntegrationResult.Success(posted + " but didn't return its ID, so the next event posts a new one.");
             }
 
             context.State.Set(stateKey, postedId);
-            return IntegrationResult.Success("Posted a new Discord message; the next events update it.");
+            context.State.Set(stateKey + UpdatedSuffix, Now());
+            var guildId = channelId == null ? null : await GuildIdAsync(client, url, cancellationToken);
+            context.State.Set(stateKey + LinkSuffix,
+                guildId == null ? null : $"https://discord.com/channels/{guildId}/{channelId}/{postedId}");
+            return IntegrationResult.Success(posted + "; the next events update it.");
         }
+
+        public IReadOnlyDictionary<string, string> DescribeState(JsonObject config, IIntegrationState state)
+        {
+            var url = config.GetText(WebhookUrlField);
+            var described = new Dictionary<string, string>();
+            var stateKey = url == null ? null : MessageStatePrefix + Hash(url);
+            if (stateKey != null && state.Get(stateKey) is { } messageId)
+            {
+                described[MessageIdState] = messageId;
+                described[MessageLinkState] = state.Get(stateKey + LinkSuffix);
+                described[MessageUpdatedState] = state.Get(stateKey + UpdatedSuffix);
+            }
+
+            return described;
+        }
+
+        private static string Now() =>
+            DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
         private static async Task<IntegrationResult> FailureAsync(HttpResponseMessage response,
             CancellationToken cancellationToken)
@@ -295,21 +336,48 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             return builder.Uri.ToString();
         }
 
-        private static async Task<string> MessageIdAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+        /// <summary>The posted message's ID and channel (a thread's ID for a thread) from Discord's answer.</summary>
+        private static async Task<(string Id, string ChannelId)> PostedMessageAsync(HttpResponseMessage response,
+            CancellationToken cancellationToken)
         {
             try
             {
                 using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-                return json.RootElement.ValueKind == JsonValueKind.Object &&
-                       json.RootElement.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
-                    ? id.GetString()
-                    : null;
+                return (Text(json.RootElement, "id"), Text(json.RootElement, "channel_id"));
             }
             catch (JsonException)
+            {
+                return (null, null);
+            }
+        }
+
+        /// <summary>The Discord server (guild) the webhook posts in, for message links; null if Discord doesn't say.</summary>
+        private static async Task<string> GuildIdAsync(HttpClient client, string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var webhook = new UriBuilder(url.Trim()) { Query = string.Empty }.Uri;
+                using var response = await client.GetAsync(webhook, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                return Text(json.RootElement, "guild_id");
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException ||
+                                       ex is TaskCanceledException && !cancellationToken.IsCancellationRequested)
             {
                 return null;
             }
         }
+
+        private static string Text(JsonElement element, string property) =>
+            element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value) &&
+            value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
 
         /// <summary>Identifies the webhook in stored state without storing its secret URL.</summary>
         private static string Hash(string url)

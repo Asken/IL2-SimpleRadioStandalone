@@ -42,6 +42,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// return <see cref="IntegrationResult.Fail"/> for failures retrying will not fix.
         /// </summary>
         Task<IntegrationResult> ExecuteAsync(IntegrationExecutionContext context, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// What the action keeps between runs, for its settings editor (<see cref="IntegrationActionEditor.State"/>),
+        /// e.g. the Discord message it keeps updated. <paramref name="config"/> has the secrets decrypted.
+        /// </summary>
+        IReadOnlyDictionary<string, string> DescribeState(JsonObject config, IIntegrationState state) =>
+            new Dictionary<string, string>();
     }
 
     /// <summary>Base for an action's settings editor shown on the integration page.</summary>
@@ -55,6 +62,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         /// <summary>The selected trigger events, for field pickers and previews; empty until one is added.</summary>
         [Parameter] public IReadOnlyList<SrsEventType> Triggers { get; set; } = Array.Empty<SrsEventType>();
+
+        /// <summary>What the saved integration's action keeps between runs (<see cref="IIntegrationAction.DescribeState"/>).</summary>
+        [Parameter] public IReadOnlyDictionary<string, string> State { get; set; } = new Dictionary<string, string>();
 
         [Parameter] public EventCallback ConfigChanged { get; set; }
 

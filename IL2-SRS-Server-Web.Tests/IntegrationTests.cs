@@ -412,6 +412,44 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public async Task NewerRunsWaitWhileAnOlderRunOfTheIntegrationWaitsForARetry()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            Save(service, "Status", retryMode: RetryMode.Fixed, maxRetries: 3);
+            var other = Save(service, "Zulu");
+            action.Results.Enqueue(IntegrationResult.Retry("Bad gateway"));
+            dispatcher.Match(Connected(coalition: 1));
+            dispatcher.Match(Connected(coalition: 2));
+
+            var first = await RunNext(service, dispatcher);
+            Assert.Equal(ExecutionStatus.Queued, first.Status);
+
+            // Only the other integration's run can start; the newer "Status" run waits for the retry.
+            Assert.Equal(new[] { other.Id }, service.Store.Due(DateTime.UtcNow, 100).Select(r => r.IntegrationId));
+            Assert.Equal(first.Id, service.Store.Due(DateTime.UtcNow.AddHours(1), 100).First().Id);
+        }
+
+        [Fact]
+        public async Task EventsPublishedWhileShuttingDownAreStillSent()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                new AuditRetention());
+            Save(service, "Joins");
+
+            events.Publish(Connected());
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await dispatcher.SendDueRunsAsync(deadline.Token);
+
+            Assert.Single(action.Runs);
+            Assert.Equal(ExecutionStatus.Succeeded, Assert.Single(service.Store.QueryExecutions()).Status);
+        }
+
+        [Fact]
         public async Task RetriesTemporaryFailuresUntilMaxRetriesThenFails()
         {
             using var temp = new TempDirectory();

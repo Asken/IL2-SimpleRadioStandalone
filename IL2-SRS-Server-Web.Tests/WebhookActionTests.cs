@@ -65,6 +65,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public void LeavesTheAdminUrlUnescapedSoTheLinkWorks()
+        {
+            var data = EventData.From(SrsEvent.Create(SrsEventTypes.ServerStarted, "system", "started"),
+                new JsonObject { ["name"] = "srs_main", ["adminUrl"] = "https://srs-admin.example.com/a_b" });
+
+            Assert.Equal(@"srs\_main https://srs-admin.example.com/a_b",
+                MessageTemplate.Render("{{ server.name }} {{ server.adminUrl }}", data, TemplateEscape.DiscordMarkdown));
+        }
+
+        [Fact]
         public void EscapesTextForJsonStrings()
         {
             var data = EventData.From(SrsEvent.Create(SrsEventTypes.ClientConnected, "system", "connected",
@@ -219,6 +229,28 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public async Task UpdatesClearTheOtherStyleSoAStyleChangeLeavesNothingBehind()
+        {
+            var (action, webhook) = Create();
+            var state = new MemoryIntegrationState();
+            var config = new JsonObject { ["webhookUrl"] = Url, ["messageMode"] = "update" };
+            webhook.Responses.Enqueue(Posted("111"));
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+
+            config["style"] = "embed";
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            var toEmbed = JsonDocument.Parse(webhook.Requests[^1].Body).RootElement;
+            Assert.Equal("", toEmbed.GetProperty("content").GetString());
+            Assert.Equal(1, toEmbed.GetProperty("embeds").GetArrayLength());
+
+            config["style"] = "text";
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+            var toText = JsonDocument.Parse(webhook.Requests[^1].Body).RootElement;
+            Assert.NotEqual("", toText.GetProperty("content").GetString());
+            Assert.Equal(0, toText.GetProperty("embeds").GetArrayLength());
+        }
+
+        [Fact]
         public async Task KeepsOneMessageUpdatedAndPostsANewOneWhenItIsGone()
         {
             var (action, webhook) = Create();
@@ -227,10 +259,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 
             webhook.Responses.Enqueue(Posted("111"));
             var first = await action.ExecuteAsync(Context(config, state), CancellationToken.None);
-            Assert.Equal("Posted a new Discord message; the next events update it.", first.Message);
+            Assert.Equal("Posted Discord message 111; the next events update it.", first.Message);
+            Assert.Equal("111", action.DescribeState(config, state)[DiscordWebhookAction.MessageIdState]);
 
             var second = await action.ExecuteAsync(Context(config, state), CancellationToken.None);
-            Assert.Equal("Updated the Discord message.", second.Message);
+            Assert.Equal("Updated Discord message 111.", second.Message);
             var (edit, editBody) = webhook.Requests[^1];
             Assert.Equal(HttpMethod.Patch, edit.Method);
             Assert.Equal(Url + "/messages/111", edit.RequestUri!.ToString());
@@ -246,6 +279,31 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 
             await action.ExecuteAsync(Context(config, state), CancellationToken.None);
             Assert.Equal(Url + "/messages/222", webhook.Requests[^1].Request.RequestUri!.ToString());
+        }
+
+        [Fact]
+        public async Task RemembersALinkToTheUpdatedMessage()
+        {
+            var (action, webhook) = Create();
+            var state = new MemoryIntegrationState();
+            var config = new JsonObject { ["webhookUrl"] = Url + "?thread_id=5", ["messageMode"] = "update" };
+            webhook.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"id\": \"111\", \"channel_id\": \"5\"}")
+            });
+            webhook.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"id\": \"1\", \"guild_id\": \"42\", \"channel_id\": \"3\"}")
+            });
+
+            await action.ExecuteAsync(Context(config, state), CancellationToken.None);
+
+            var (get, _) = webhook.Requests[^1];
+            Assert.Equal(HttpMethod.Get, get.Method);
+            Assert.Equal(Url, get.RequestUri!.ToString());
+            var described = action.DescribeState(config, state);
+            Assert.Equal("https://discord.com/channels/42/5/111", described[DiscordWebhookAction.MessageLinkState]);
+            Assert.NotNull(described[DiscordWebhookAction.MessageUpdatedState]);
         }
 
         [Fact]
@@ -391,7 +449,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
     public class ActionEditorTests
     {
         private static async Task<string> Render<T>(JsonObject config, IReadOnlyDictionary<string, string> hints = null,
-            IReadOnlyDictionary<string, string> errors = null, IReadOnlyList<SrsEventType> triggers = null)
+            IReadOnlyDictionary<string, string> errors = null, IReadOnlyList<SrsEventType> triggers = null,
+            IReadOnlyDictionary<string, string> state = null)
             where T : IComponent
         {
             await using var services = new ServiceCollection().BuildServiceProvider();
@@ -403,7 +462,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                     [nameof(IntegrationActionEditor.Config)] = config,
                     [nameof(IntegrationActionEditor.SecretHints)] = hints ?? new Dictionary<string, string>(),
                     [nameof(IntegrationActionEditor.Triggers)] = triggers ?? new[] { SrsEventTypes.ClientConnected },
-                    [nameof(IntegrationActionEditor.Errors)] = errors ?? new Dictionary<string, string>()
+                    [nameof(IntegrationActionEditor.Errors)] = errors ?? new Dictionary<string, string>(),
+                    [nameof(IntegrationActionEditor.State)] = state ?? new Dictionary<string, string>()
                 }));
                 return WebUtility.HtmlDecode(output.ToHtmlString());
             });
@@ -422,6 +482,26 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Contains("Stored — ends in 0Jdl", html);
             Assert.Contains("id=\"discord-color\"", html);
             Assert.Contains($"Client connected\n\n{name} (Red) joined", html);
+        }
+
+        [Fact]
+        public async Task DiscordEditorShowsTheMessageItKeepsUpdated()
+        {
+            var config = new JsonObject { ["messageMode"] = "update" };
+
+            var state = new Dictionary<string, string>
+            {
+                [DiscordWebhookAction.MessageIdState] = "1559535114692730952",
+                [DiscordWebhookAction.MessageLinkState] = "https://discord.com/channels/1/2/1559535114692730952",
+                [DiscordWebhookAction.MessageUpdatedState] = "2026-10-13T12:33:00Z"
+            };
+
+            Assert.Contains("None yet", await Render<DiscordWebhookEditor>(config));
+            var html = await Render<DiscordWebhookEditor>(config, state: state);
+            Assert.Contains("value=\"1559535114692730952\"", html);
+            Assert.Contains("href=\"https://discord.com/channels/1/2/1559535114692730952\"", html);
+            Assert.Contains("datetime=\"2026-10-13T12:33:00Z\"", html);
+            Assert.DoesNotContain("Current message", await Render<DiscordWebhookEditor>(new JsonObject(), state: state));
         }
 
         [Fact]

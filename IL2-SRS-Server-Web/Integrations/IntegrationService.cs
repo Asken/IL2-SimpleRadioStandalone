@@ -77,6 +77,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public IIntegrationAction FindAction(string type) =>
             type != null && _actions.TryGetValue(type, out var action) ? action : null;
 
+        /// <summary>What a saved integration's action keeps between runs, e.g. the Discord message it updates.</summary>
+        public IReadOnlyDictionary<string, string> DescribeState(long integrationId)
+        {
+            var integration = Store.GetForExecution(integrationId);
+            return integration == null || FindAction(integration.ActionType) is not { } action
+                ? new Dictionary<string, string>()
+                : action.DescribeState(integration.ActionConfig, Store.State(integrationId));
+        }
+
         /// <summary>Checks an integration before saving or testing it.</summary>
         public IntegrationValidation Validate(IntegrationDefinition draft)
         {

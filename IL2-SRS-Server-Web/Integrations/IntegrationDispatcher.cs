@@ -20,6 +20,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     /// through the queue: one run at a time per integration (so a Discord channel sees events in order),
     /// up to <see cref="MaxConcurrentRuns"/> integrations at once, with retries as configured.
     /// Queued runs survive restarts; runs interrupted by a shutdown are queued again at startup.
+    /// At shutdown it queues the events still waiting (e.g. server.stopped) and spends up to
+    /// <see cref="ShutdownGrace"/> sending the runs that are due.
     /// </summary>
     public sealed class IntegrationDispatcher : BackgroundService
     {
@@ -28,6 +30,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private static readonly TimeSpan IdleWait = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan RetentionInterval = TimeSpan.FromHours(1);
+
+        /// <summary>How long a shutdown waits for due runs; Docker kills the container 10 s after stopping it.</summary>
+        internal static readonly TimeSpan ShutdownGrace = TimeSpan.FromSeconds(5);
 
         private readonly IntegrationStore _store;
         private readonly AuditRetention _retention;
@@ -72,7 +77,46 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 Logger.Info($"Queued {requeued} integration run(s) interrupted by the last shutdown again");
             }
 
-            await Task.WhenAll(MatchLoop(stoppingToken), DispatchLoop(stoppingToken));
+            // Runs are cancelled ShutdownGrace after the stop, so the shutdown's own events can still go out.
+            using var runs = new CancellationTokenSource();
+            using var stopping = stoppingToken.Register(() => runs.CancelAfter(ShutdownGrace));
+            await Task.WhenAll(MatchLoop(stoppingToken), DispatchLoop(stoppingToken, runs.Token));
+            await SendDueRunsAsync(runs.Token);
+        }
+
+        /// <summary>
+        /// At shutdown: queues the events published while stopping and runs what is due until
+        /// <paramref name="deadline"/>. Runs still going then are queued again at the next start.
+        /// </summary>
+        internal async Task SendDueRunsAsync(CancellationToken deadline)
+        {
+            try
+            {
+                while (_incoming.Reader.TryRead(out var srsEvent))
+                {
+                    Match(srsEvent);
+                }
+
+                while (!deadline.IsCancellationRequested)
+                {
+                    StartDueRuns(deadline);
+                    if (_running.IsEmpty)
+                    {
+                        break;
+                    }
+
+                    await Task.WhenAll(_running.Values.ToArray()).WaitAsync(deadline);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Unable to send integration runs at shutdown");
+            }
+
+            await Task.WhenAll(_running.Values.ToArray());
         }
 
         /// <summary>Queues a run for every enabled integration whose trigger and conditions match the event.</summary>
@@ -117,7 +161,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
         }
 
-        private async Task DispatchLoop(CancellationToken stoppingToken)
+        private async Task DispatchLoop(CancellationToken stoppingToken, CancellationToken runToken)
         {
             var nextRetention = DateTime.UtcNow;
             while (!stoppingToken.IsCancellationRequested)
@@ -125,7 +169,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 TimeSpan wait;
                 try
                 {
-                    StartDueRuns(stoppingToken);
+                    StartDueRuns(runToken);
                     if (DateTime.UtcNow >= nextRetention)
                     {
                         nextRetention = DateTime.UtcNow + RetentionInterval;
@@ -154,11 +198,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 {
                 }
             }
-
-            await Task.WhenAll(_running.Values.ToArray());
         }
 
-        /// <summary>Starts the oldest due run of each integration that is not already running.</summary>
+        /// <summary>Starts each integration's oldest queued run, when it is due and the integration isn't running.</summary>
         private void StartDueRuns(CancellationToken stoppingToken)
         {
             if (_running.Count >= MaxConcurrentRuns)

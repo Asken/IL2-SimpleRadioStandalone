@@ -38,6 +38,34 @@
     </span>
 </div>
 
+@if (Mode == DiscordWebhookAction.ModeUpdate)
+{
+    <div class="field">
+        <label for="discord-message-id">Current message</label>
+        @if (State.TryGetValue(DiscordWebhookAction.MessageIdState, out var messageId))
+        {
+            <div class="current-message">
+                <input id="discord-message-id" class="mono" readonly value="@messageId" />
+                @if (State.GetValueOrDefault(DiscordWebhookAction.MessageLinkState) is { } link)
+                {
+                    <a href="@link" target="_blank" rel="noopener noreferrer">Open in Discord ↗</a>
+                }
+            </div>
+            <span class="field-help">
+                @if (UpdatedAt is { } updated)
+                {
+                    <text>Last posted or updated <LocalTime Value="updated" />. </text>
+                }
+                Delete the message in Discord to have the next event post a new one.
+            </span>
+        }
+        else
+        {
+            <span id="discord-message-id" class="field-help">None yet — the next event posts one.</span>
+        }
+    </div>
+}
+
 <div class="field-grid">
     <div class="field">
         <label for="discord-style">Style</label>
@@ -101,6 +129,12 @@
 @code {
     private string Style => GetString(DiscordWebhookAction.StyleField) ?? DiscordWebhookAction.StyleText;
     private string Mode => GetString(DiscordWebhookAction.MessageModeField) ?? DiscordWebhookAction.ModePost;
+
+    private DateTime? UpdatedAt =>
+        DateTime.TryParse(State.GetValueOrDefault(DiscordWebhookAction.MessageUpdatedState), CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var updated)
+            ? updated
+            : null;
 
     private string Preview(JsonElement data)
     {

@@ -258,6 +258,7 @@
     private string _actionType = string.Empty;
     private JsonObject _config = new();
     private IReadOnlyDictionary<string, string> _hints = new Dictionary<string, string>();
+    private IReadOnlyDictionary<string, string> _actionState = new Dictionary<string, string>();
     private RetryMode _retryMode = RetryMode.None;
     private int _maxRetries = 3;
     private IntegrationDefinition _stored;
@@ -279,6 +280,9 @@
         [nameof(IntegrationActionEditor.Config)] = _config,
         [nameof(IntegrationActionEditor.SecretHints)] = _hints,
         [nameof(IntegrationActionEditor.Triggers)] = Triggers,
+        [nameof(IntegrationActionEditor.State)] = _stored != null && _stored.ActionType == _actionType
+            ? _actionState
+            : new Dictionary<string, string>(),
         [nameof(IntegrationActionEditor.ConfigChanged)] = EventCallback.Factory.Create(this, () => _test = null),
         [nameof(IntegrationActionEditor.Errors)] = ConfigErrors(),
         [nameof(IntegrationActionEditor.FieldTouched)] = EventCallback.Factory.Create<string>(this,
@@ -358,6 +362,7 @@
         _actionType = _stored.ActionType;
         _config = (JsonObject)_stored.ActionConfig.DeepClone();
         _hints = _stored.SecretHints;
+        _actionState = Integrations.DescribeState(_stored.Id);
         _retryMode = _stored.RetryMode;
         _maxRetries = _stored.RetryMode == RetryMode.None ? 3 : _stored.MaxRetries;
     }

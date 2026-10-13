@@ -196,18 +196,27 @@ SELECT last_insert_rowid();";
             using var connection = _database.Open();
             using var command = connection.CreateCommand();
             command.CommandText = $@"SELECT {ExecutionColumns} FROM integration_executions
-WHERE status = 'queued' AND next_attempt_at <= $now ORDER BY id LIMIT $limit;";
+WHERE status = 'queued' AND next_attempt_at <= $now AND {IsOldestPending}
+ORDER BY id LIMIT $limit;";
             command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(utcNow));
             command.Parameters.AddWithValue("$limit", limit);
             return ReadExecutions(command);
         }
 
-        /// <summary>When the next queued run is due, or null if none are queued.</summary>
+        /// <summary>
+        /// Only an integration's oldest queued or running run may start, so runs go out in event order: a newer
+        /// run waits while an older one waits for a retry, e.g. a "started" status is never sent after "stopped".
+        /// </summary>
+        private const string IsOldestPending = @"id = (SELECT MIN(pending.id) FROM integration_executions pending
+    WHERE pending.integration_id = integration_executions.integration_id AND pending.status IN ('queued', 'running'))";
+
+        /// <summary>When the next run that can start is due, or null if there is none.</summary>
         public DateTime? NextDueAt()
         {
             using var connection = _database.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT MIN(next_attempt_at) FROM integration_executions WHERE status = 'queued';";
+            command.CommandText =
+                $"SELECT MIN(next_attempt_at) FROM integration_executions WHERE status = 'queued' AND {IsOldestPending};";
             return SrsDatabase.ParseNullableTimestamp(command.ExecuteScalar());
         }
 

@@ -134,15 +134,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             builder.Services.AddSingleton<ServerState>();
             builder.Services.AddSingleton<ClientEventRecorder>();
             builder.Services.AddSingleton<ServerAdminService>();
-            // Registered first so it stops last and stores the shutdown events.
-            builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());
-            builder.Services.AddHostedService<SrsServerHostedService>();
             builder.Services.AddSingleton<SecretProtector>();
             builder.Services.AddSingleton<ServerIdentity>();
             builder.Services.AddSingleton<IntegrationStore>();
             builder.Services.AddSingleton<IntegrationService>();
             builder.Services.AddSingleton<IntegrationDispatcher>();
+            // Hosted services stop in reverse order: the audit log and the integration dispatcher are registered
+            // before the SRS server so they stop after it and still handle the server.stopped event.
+            builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());
             builder.Services.AddHostedService(services => services.GetRequiredService<IntegrationDispatcher>());
+            builder.Services.AddHostedService<SrsServerHostedService>();
             builder.Services.AddSingleton<WebhookRateLimiter>();
             builder.Services.AddHttpClient(WebhookHttp.ClientName, client =>
             {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -78,11 +79,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 return string.Empty;
             }
 
-            var globals = Convert(data, escape) as ScriptObject ?? new ScriptObject();
+            var globals = Convert(data, escape, null) as ScriptObject ?? new ScriptObject();
             if (escape != TemplateEscape.None)
             {
                 // The same values without escaping, for dates and comparisons: {{ raw.client.name }}.
-                globals["raw"] = Convert(data, TemplateEscape.None);
+                globals["raw"] = Convert(data, TemplateEscape.None, null);
             }
 
             using var timeout = new CancellationTokenSource(RenderTimeout);
@@ -119,6 +120,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             return output.Length > MaxOutputLength ? output[..MaxOutputLength] : output;
         }
 
+        /// <summary>
+        /// Addresses set by an admin and checked to be http(s) URLs. They aren't Markdown-escaped: a backslash
+        /// before a '-' or '_' would break the link in Discord.
+        /// </summary>
+        private static readonly HashSet<string> Links = new(StringComparer.Ordinal) { "server.adminUrl" };
+
         /// <summary>Escapes text for Discord so it shows as written, without formatting.</summary>
         public static string EscapeMarkdown(string text)
         {
@@ -153,7 +160,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             return text == null || text.Length <= length ? text : text[..(length - 1)] + "…";
         }
 
-        private static object Convert(JsonElement element, TemplateEscape escape)
+        private static object Convert(JsonElement element, TemplateEscape escape, string path)
         {
             switch (element.ValueKind)
             {
@@ -161,7 +168,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     var obj = new ScriptObject();
                     foreach (var property in element.EnumerateObject())
                     {
-                        obj[property.Name] = Convert(property.Value, escape);
+                        obj[property.Name] = Convert(property.Value, escape,
+                            path == null ? property.Name : path + "." + property.Name);
                     }
 
                     return obj;
@@ -169,12 +177,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     var array = new ScriptArray();
                     foreach (var item in element.EnumerateArray())
                     {
-                        array.Add(Convert(item, escape));
+                        array.Add(Convert(item, escape, path + "[]"));
                     }
 
                     return array;
                 case JsonValueKind.String:
-                    return Escape(element.GetString(), escape);
+                    return escape == TemplateEscape.DiscordMarkdown && Links.Contains(path)
+                        ? element.GetString()
+                        : Escape(element.GetString(), escape);
                 case JsonValueKind.Number:
                     return element.TryGetInt64(out var integer) ? integer : element.GetDouble();
                 case JsonValueKind.True:
