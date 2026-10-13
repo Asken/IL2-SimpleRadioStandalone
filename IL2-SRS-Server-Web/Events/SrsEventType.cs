@@ -100,7 +100,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             new("event.actor", "string", "Who caused it: system, admin, api:<key name> or anonymous", "system"),
             new("event.message", "string", "The event log message"),
             new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z"),
-            new("server.name", "string", "Server Name setting, or the host name when it isn't set", "Combat Box"),
+            new("server.name", "string", "Server Name setting, or the host name when it isn't set", "My SRS Server"),
             new("server.hostname", "string",
                 "Host name; in Docker the container ID unless the stack sets hostname", "srs-1"),
             new("server.version", "string", "Server version, e.g. the image version", "1.0.5.0-preview"),

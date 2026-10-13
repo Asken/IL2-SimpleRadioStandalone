@@ -27,10 +27,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Equal(ReleaseMetadata.Version, identity.Version);
             Assert.Null(identity.AdminUrl);
 
-            Assert.Null(settings.Set(ServerSettingsKeys.SERVER_NAME, " Combat Box "));
+            Assert.Null(settings.Set(ServerSettingsKeys.SERVER_NAME, " My SRS Server "));
             Assert.Null(settings.Set(ServerSettingsKeys.PUBLIC_ADMIN_URL, "https://srs.example.com"));
             identity = new ServerIdentity(settings, "1.0.5.0-preview", "srs-1");
-            Assert.Equal("Combat Box", identity.Name);
+            Assert.Equal("My SRS Server", identity.Name);
             Assert.Equal("1.0.5.0-preview", identity.Version);
             Assert.Equal("https://srs.example.com", identity.AdminUrl);
         }
@@ -40,7 +40,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             using var temp = new TempDirectory();
             var settings = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
-            Assert.Null(settings.Set(ServerSettingsKeys.SERVER_NAME, "Combat Box"));
+            Assert.Null(settings.Set(ServerSettingsKeys.SERVER_NAME, "My SRS Server"));
             Assert.Null(settings.Set(ServerSettingsKeys.PUBLIC_ADMIN_URL, "https://srs.example.com"));
 
             var synced = settings.ToDictionary();
@@ -65,19 +65,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             var identity = new JsonObject
             {
-                ["name"] = "Combat Box", ["hostname"] = "srs-1", ["version"] = "1.0.5.0", ["adminUrl"] = null
+                ["name"] = "My SRS Server", ["hostname"] = "srs-1", ["version"] = "1.0.5.0", ["adminUrl"] = null
             };
             var started = SrsEvent.Create(SrsEventTypes.ServerStopped, "admin", "stopped",
                 EventPayload.Server(6002, 3, DateTime.UtcNow.AddMinutes(-90)));
             var data = EventData.From(started, identity);
 
-            Assert.Equal("Combat Box", EventData.AsText(EventData.Resolve(data, "server.name")));
+            Assert.Equal("My SRS Server", EventData.AsText(EventData.Resolve(data, "server.name")));
             Assert.Equal("srs-1", EventData.AsText(EventData.Resolve(data, "server.hostname")));
             Assert.Equal("6002", EventData.AsText(EventData.Resolve(data, "server.port")));
             Assert.InRange(EventData.Resolve(data, "server.uptime")!.Value.GetInt64(), 5390, 5410);
 
             var connected = EventData.From(SrsEvent.Create(SrsEventTypes.ClientConnected, "system", "joined"), identity);
-            Assert.Equal("Combat Box", EventData.AsText(EventData.Resolve(connected, "server.name")));
+            Assert.Equal("My SRS Server", EventData.AsText(EventData.Resolve(connected, "server.name")));
         }
 
         [Fact]
@@ -93,9 +93,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         [Fact]
         public void SamplesUseTheRealServerIdentity()
         {
-            var sample = EventData.Sample(SrsEventTypes.ServerStarted, new JsonObject { ["name"] = "Combat Box" });
+            var sample = EventData.Sample(SrsEventTypes.ServerStarted, new JsonObject { ["name"] = "My SRS Server" });
 
-            Assert.Equal("Combat Box", EventData.AsText(EventData.Resolve(sample, "server.name")));
+            Assert.Equal("My SRS Server", EventData.AsText(EventData.Resolve(sample, "server.name")));
             Assert.Equal("srs-1", EventData.AsText(EventData.Resolve(EventData.Sample(SrsEventTypes.ServerStarted),
                 "server.hostname")));
             Assert.Equal("6002", EventData.AsText(EventData.Resolve(sample, "server.port")));
