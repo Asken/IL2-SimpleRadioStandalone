@@ -342,6 +342,9 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 .field { display: flex; flex-direction: column; gap: .3rem; }
 .field > label, .field-label { font-weight: 600; font-size: .9rem; }
 .field-help { color: var(--muted); font-size: .84rem; }
+/* Webhook URLs are secrets, not passwords: a masked text input, so browsers don't fill in the login password. */
+.secret-input { -webkit-text-security: disc; }
+.secret-input::placeholder { -webkit-text-security: none; }
 .field-inline { flex-direction: row; align-items: center; gap: .6rem; }
 .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 .field textarea, .action-config textarea {

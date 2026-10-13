@@ -4,7 +4,8 @@
 
 <div class="field">
     <label for="discord-url">Webhook URL</label>
-    <input id="discord-url" type="password" autocomplete="off" spellcheck="false"
+    <input id="discord-url" type="text" class="secret-input" autocomplete="off" spellcheck="false"
+           data-1p-ignore data-lpignore="true" data-bwignore
            placeholder="@SecretPlaceholder(DiscordWebhookAction.WebhookUrlField, "https://discord.com/api/webhooks/…")"
            value="@GetString(DiscordWebhookAction.WebhookUrlField)"
            @onchange="e => SetString(DiscordWebhookAction.WebhookUrlField, e.Value?.ToString()?.Trim())"

@@ -2,7 +2,8 @@
 
 <div class="field">
     <label for="http-url">URL</label>
-    <input id="http-url" type="password" autocomplete="off" spellcheck="false"
+    <input id="http-url" type="text" class="secret-input" autocomplete="off" spellcheck="false"
+           data-1p-ignore data-lpignore="true" data-bwignore
            placeholder="@SecretPlaceholder(HttpWebhookAction.UrlField, "https://example.com/hooks/srs")"
            value="@GetString(HttpWebhookAction.UrlField)"
            @onchange="e => SetString(HttpWebhookAction.UrlField, e.Value?.ToString()?.Trim())"
