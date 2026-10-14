@@ -32,6 +32,7 @@
     <SolidColorBrush x:Key="MilTextPrimaryBrush" Color="{StaticResource MilTextPrimaryColor}" />
     <SolidColorBrush x:Key="MilTextSecondaryBrush" Color="{StaticResource MilTextSecondaryColor}" />
     <SolidColorBrush x:Key="MilAccentBrush" Color="{StaticResource MilAccentColor}" />
+    <SolidColorBrush x:Key="MilTitleTextBrush" Color="{StaticResource MilAccentColor}" />
     <SolidColorBrush x:Key="MilActionBrush" Color="{StaticResource MilActionColor}" />
     <SolidColorBrush x:Key="MilActionBorderBrush" Color="{StaticResource MilActionBorderColor}" />
     <SolidColorBrush x:Key="MilActionHoverBrush" Color="{StaticResource MilActionHoverColor}" />
@@ -45,6 +46,15 @@
     <SolidColorBrush x:Key="OverlayTxRxLabelBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="OverlayChannelButtonForegroundBrush" Color="{StaticResource MilTextPrimaryColor}" />
     <SolidColorBrush x:Key="OverlayChannelButtonSelectedForegroundBrush" Color="{StaticResource MilTextPrimaryColor}" />
+
+    <!-- Main window status panels (connection status, Combat Box RCI). -->
+    <SolidColorBrush x:Key="MilStatusIdleBackgroundBrush" Color="#2B251B" />
+    <SolidColorBrush x:Key="MilStatusConnectedBackgroundBrush" Color="#20301C" />
+    <SolidColorBrush x:Key="MilStatusErrorBackgroundBrush" Color="#321C18" />
+    <SolidColorBrush x:Key="MilStatusConnectedTextBrush" Color="{StaticResource MilLedOnColor}" />
+    <SolidColorBrush x:Key="MilStatusErrorTextBrush" Color="{StaticResource MilLedErrorColor}" />
+    <SolidColorBrush x:Key="MilRciInactiveBackgroundBrush" Color="#444444" />
+    <SolidColorBrush x:Key="MilRciInactiveTextBrush" Color="#FFFFFF" />
 
     <FontFamily x:Key="MilFontStencil">pack://application:,,,/IL2-SR-ClientRadio;component/Fonts/#Allerta Stencil</FontFamily>
     <FontFamily x:Key="MilFontMono">pack://application:,,,/IL2-SR-ClientRadio;component/Fonts/#Share Tech Mono</FontFamily>

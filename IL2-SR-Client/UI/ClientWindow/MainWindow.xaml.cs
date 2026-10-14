@@ -30,6 +30,7 @@ using Ciribob.IL2.SimpleRadio.Standalone.Client.Network.Models;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Preferences;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Settings;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons;
+using Ciribob.IL2.SimpleRadio.Standalone.Client.Themes;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.Diagnostics;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.ClientList;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.Favourites;
@@ -96,6 +97,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
         private const string ThemeSovietA14SteelGrey = "Soviet A-14 Steel Grey";
         private const string ThemeIvory = "Ivory";
         private const string ThemeWhite = "White";
+        private const string ThemeClassic = UiTheme.Classic;
+        private const double ClassicVuMeterHeight = 20;
+        private const double ClassicClientWidth = 550;
+        private const double ClassicClientHeight = 610;
+        private const double ClassicControlsScale = 0.8;
+        private const double ClassicColumnGap = 12;
+        private const double ClassicRowGap = 6;
+        private const double ClassicOverlayButtonWidth = 150;
+        private const double ClassicSettingsLabelShare = 2; // label column 2 : 1 against the controls
+        private bool _classicLayout;
         private const string VuMeterStyleAuto = "Auto";
         private const string VuMeterStyleLight = "Light";
         private const string VuMeterStyleDark = "Dark";
@@ -230,6 +241,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             InitWeatheringControls();
             InitVuMeterStylePicker();
             IL2_SR_Client.App.ApplyVuMeterStyle();
+            ApplyClassicThemeLayout();
 
             SpeakerBoost.Value = _globalSettings.GetClientSetting(GlobalSettingsKeys.SpeakerBoost).DoubleValue;
 
@@ -967,7 +979,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
         private void InitThemePicker()
         {
             _initialisingThemePicker = true;
-            ThemePicker.ItemsSource = new[] { ThemeBakelite, ThemeGrey, ThemeRafGreyGreen, ThemeUsaafOliveDrab, ThemeLuftwaffeRlm66, ThemeSovietA14SteelGrey, ThemeIvory, ThemeWhite };
+            ThemePicker.ItemsSource = new[] { ThemeBakelite, ThemeGrey, ThemeRafGreyGreen, ThemeUsaafOliveDrab, ThemeLuftwaffeRlm66, ThemeSovietA14SteelGrey, ThemeIvory, ThemeWhite, ThemeClassic };
             ThemePicker.SelectedItem = CurrentTheme();
             _initialisingThemePicker = false;
         }
@@ -1045,6 +1057,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
                 return ThemeWhite;
             }
 
+            if (normalizedTheme == NormalizeThemeName(ThemeClassic))
+            {
+                return ThemeClassic;
+            }
+
             return ThemeBakelite;
         }
 
@@ -1075,10 +1092,27 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
                 return;
             }
 
+            // Classic swaps the control styles, which open windows only pick up when they are created.
+            var controlStylesChange = UiTheme.IsClassic(selectedTheme) != UiTheme.IsClassic(CurrentTheme());
+
             _globalSettings.SetClientSetting(GlobalSettingsKeys.Theme, selectedTheme);
             IL2_SR_Client.App.ApplyUiTheme();
             IL2_SR_Client.App.ApplyVuMeterStyle();
             ApplyWeatheringOpacity();
+
+            if (controlStylesChange)
+            {
+                var restartResult = ShowLocalizedYesNo(
+                    LocalizationManager.Get("Restart SRS to finish switching to or from the Classic theme.") + "\n\n" +
+                    LocalizationManager.Get("Restart SRS now?"),
+                    LocalizationManager.Get("Restart Required"),
+                    MessageBoxImage.Question);
+
+                if (restartResult == MessageBoxResult.Yes)
+                {
+                    RestartClient("theme change");
+                }
+            }
         }
 
         private void VuMeterStylePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1173,6 +1207,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             if (normalizedTheme == NormalizeThemeName(ThemeBakelite))
             {
                 return ThemeBakelite;
+            }
+
+            if (normalizedTheme == NormalizeThemeName(ThemeClassic))
+            {
+                return ThemeClassic;
             }
 
             return null;
@@ -1485,10 +1524,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
             if (ClientState.IsConnectionErrored)
             {
-                ConnectionStatusStrip.Background = new SolidColorBrush(Color.FromRgb(0x32, 0x1C, 0x18));
-                ConnectionStatusStrip.BorderBrush = GetConnectionStatusBrush("MilLedErrorBrush", Brushes.Red);
+                ConnectionStatusStrip.Background = GetConnectionStatusBrush("MilStatusErrorBackgroundBrush", new SolidColorBrush(Color.FromRgb(0x32, 0x1C, 0x18)));
+                ConnectionStatusStrip.BorderBrush = GetConnectionStatusBrush("MilStatusErrorTextBrush", Brushes.Red);
                 ConnectionStatusLamp.Fill = GetConnectionStatusBrush("MilLedErrorBrush", Brushes.Red);
-                ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilLedErrorBrush", Brushes.Red);
+                ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilStatusErrorTextBrush", Brushes.Red);
                 ConnectionStatusText.Text = LocalizationManager.Get("CONNECTION ERROR");
                 ConnectionStatusHint.Text = LocalizationManager.Get("Check address or network");
                 return;
@@ -1496,10 +1535,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
             if (ClientState.IsConnected)
             {
-                ConnectionStatusStrip.Background = new SolidColorBrush(Color.FromRgb(0x20, 0x30, 0x1C));
-                ConnectionStatusStrip.BorderBrush = GetConnectionStatusBrush("MilLedOnBrush", Brushes.LimeGreen);
+                ConnectionStatusStrip.Background = GetConnectionStatusBrush("MilStatusConnectedBackgroundBrush", new SolidColorBrush(Color.FromRgb(0x20, 0x30, 0x1C)));
+                ConnectionStatusStrip.BorderBrush = GetConnectionStatusBrush("MilStatusConnectedTextBrush", Brushes.LimeGreen);
                 ConnectionStatusLamp.Fill = GetConnectionStatusBrush("MilLedOnBrush", Brushes.LimeGreen);
-                ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilLedOnBrush", Brushes.LimeGreen);
+                ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilStatusConnectedTextBrush", Brushes.LimeGreen);
                 ConnectionStatusText.Text = LocalizationManager.Get("CONNECTED");
                 ConnectionStatusHint.Text = ClientState.IsGameConnected
                     ? LocalizationManager.Get("Server and IL-2 active")
@@ -1507,7 +1546,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
                 return;
             }
 
-            ConnectionStatusStrip.Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x25, 0x1B));
+            ConnectionStatusStrip.Background = GetConnectionStatusBrush("MilStatusIdleBackgroundBrush", new SolidColorBrush(Color.FromRgb(0x2B, 0x25, 0x1B)));
             ConnectionStatusStrip.BorderBrush = GetConnectionStatusBrush("MilLedOffBrush", Brushes.Gray);
             ConnectionStatusLamp.Fill = GetConnectionStatusBrush("MilLedOffBrush", Brushes.Gray);
             ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilTextSecondaryBrush", Brushes.LightGray);
@@ -1608,8 +1647,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
             _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientX, bounds.Left);
             _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientY, bounds.Top);
-            _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientWidth, bounds.Width);
-            _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientHeight, bounds.Height);
+            // Classic's fixed size is not saved, so the other themes reopen at the size last chosen in them.
+            // Uses the layout this window opened with: the theme setting may already have changed before a restart.
+            if (!_classicLayout)
+            {
+                _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientWidth, bounds.Width);
+                _globalSettings.SetPositionSetting(GlobalSettingsKeys.ClientHeight, bounds.Height);
+            }
 
             //save window position and size
             base.OnClosing(e);
@@ -1775,8 +1819,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
         private void ApplyRciDisplayState(RciDisplayState displayState)
         {
             RciStatusLabel.Text = displayState.StatusText;
-            RciStatusLabel.Foreground = displayState.MainWindowStatusForeground;
-            RciStatusIndicator.Background = displayState.StatusBackground;
+            // The coloured RCI states are the same in every theme; the inactive state follows the theme's status panels.
+            var inactive = displayState.Status == RciStatus.None;
+            RciStatusLabel.Foreground = inactive
+                ? GetConnectionStatusBrush("MilRciInactiveTextBrush", displayState.MainWindowStatusForeground)
+                : displayState.MainWindowStatusForeground;
+            RciStatusIndicator.Background = inactive
+                ? GetConnectionStatusBrush("MilRciInactiveBackgroundBrush", displayState.StatusBackground)
+                : displayState.StatusBackground;
             RciCallsignLabel.Text = displayState.RcoOnDutyText;
             RciCallsignLabel.Visibility = displayState.HasRcoOnDuty
                 ? Visibility.Visible
@@ -1989,6 +2039,194 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             SetOverlayOpacity(GlobalSettingsKeys.PilotRosterOpacity, _pilotRosterWindow, e.NewValue);
         }
 
+        /// <summary>
+        /// Classic uses the plain MahApps styles: the VU meters are thin bars, as in 1.0.2.0, and the 3D,
+        /// weathering and VU needle options do nothing, so they are disabled (their saved values are kept).
+        /// </summary>
+        private void ApplyClassicThemeLayout()
+        {
+            if (!UiTheme.IsClassicSelected())
+            {
+                return;
+            }
+
+            _classicLayout = true;
+            Mic_VU.Height = ClassicVuMeterHeight;
+            Speaker_VU.Height = ClassicVuMeterHeight;
+            ThreeDEffectsToggle.IsEnabled = false;
+            WeatheringEffectToggle.IsEnabled = false;
+            WeatheringOpacitySlider.IsEnabled = false;
+            VuMeterStylePicker.IsEnabled = false;
+
+            // 1.0.2.0's window was a fixed 550 x 610: one column on the General tab, Favourites on its own tab.
+            MinWidth = 0;
+            MinHeight = 0;
+            Width = ClassicClientWidth;
+            Height = ClassicClientHeight;
+            ResizeMode = ResizeMode.CanMinimize;
+
+            StackColumnsVertically(AudioGroupsGrid);
+            StackColumnsVertically(ServerOverlaysGrid);
+            OverlaysColumn.Margin = new Thickness(5, 0, 5, 5);
+            ArrangeMicrophonePanelInOneRow();
+            ArrangeServerPanelInTwoColumns();
+            ShowWithoutHeader(CombatBoxRciPanel);
+            ArrangeOverlayButtonsInOneRow();
+
+            GeneralLayout.Children.Remove(FavouritesGroupBox);
+            TabControl.Items.Insert(2, new TabItem
+            {
+                Header = LocalizationManager.Get("Favourites"),
+                Content = new ScrollViewer
+                {
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = FavouritesGroupBox
+                }
+            });
+            FavouritesGroupBox.Margin = new Thickness(10, 0, 10, 0);
+            // On its own tab the favourites list can use the full height, with the add form underneath it.
+            if (FavouritesGroupBox.Content is UserControl favouritesView)
+            {
+                favouritesView.MaxHeight = double.PositiveInfinity;
+                if (favouritesView.Content is Grid favouritesGrid)
+                {
+                    StackColumnsVertically(favouritesGrid, true);
+                }
+            }
+
+            // The label columns and the controls table are sized for the wider window.
+            GlobalSettingsLabelColumn.Width = new GridLength(ClassicSettingsLabelShare, GridUnitType.Star);
+            AudioOptionsLabelColumn.Width = new GridLength(ClassicSettingsLabelShare, GridUnitType.Star);
+            ControlsLayout.LayoutTransform = new ScaleTransform(ClassicControlsScale, ClassicControlsScale);
+        }
+
+        /// <summary>Classic: draws a group box as just its border, without the header bar.</summary>
+        private static void ShowWithoutHeader(GroupBox groupBox)
+        {
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+            border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+            // No fill: MahApps uses the group box background for the header bar colour.
+            border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+
+            var content = new FrameworkElementFactory(typeof(ContentPresenter));
+            content.SetValue(FrameworkElement.MarginProperty, new TemplateBindingExtension(Control.PaddingProperty));
+            border.AppendChild(content);
+
+            groupBox.Template = new ControlTemplate(typeof(GroupBox)) { VisualTree = border };
+        }
+
+        /// <summary>Classic: microphone, VU bar and audio preview button on one row.</summary>
+        private void ArrangeMicrophonePanelInOneRow()
+        {
+            MicrophoneGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            (Preview.Parent as Panel)?.Children.Remove(Preview);
+            Grid.SetColumn(Preview, 2);
+            MicrophoneGrid.Children.Add(Preview);
+
+            Mic.Margin = new Thickness(0, 0, ClassicColumnGap, 0);
+            Mic.VerticalAlignment = VerticalAlignment.Center;
+            ((FrameworkElement)Mic_VU.Parent).VerticalAlignment = VerticalAlignment.Center;
+            Preview.Margin = new Thickness(ClassicColumnGap, 0, 0, 0);
+            Preview.VerticalAlignment = VerticalAlignment.Center;
+            MicrophoneGrid.Margin = new Thickness(0, ClassicRowGap, 0, ClassicRowGap);
+        }
+
+        /// <summary>
+        /// Classic: the server controls in two columns. Server and address on top; the status box beside
+        /// the connect and server settings buttons underneath.
+        /// </summary>
+        private void ArrangeServerPanelInTwoColumns()
+        {
+            ServerLayout.Children.Clear();
+
+            var grid = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ClassicColumnGap) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            for (var row = 0; row < 3; row++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            }
+
+            Place(grid, ServerAddressPicker, 0, 0);
+            Place(grid, ServerIp, 0, 2);
+            Place(grid, ConnectionStatusStrip, 1, 0, 2);
+            Place(grid, StartStop, 1, 2);
+            Place(grid, ToggleServerSettings, 2, 2);
+
+            ServerAddressPicker.Margin = new Thickness(0, 0, 0, ClassicRowGap);
+            ServerIp.Margin = new Thickness(0, 0, 0, ClassicRowGap);
+            ConnectionStatusStrip.Margin = new Thickness(0);
+            ConnectionStatusStrip.Height = double.NaN;
+            StartStop.Margin = new Thickness(0, 0, 0, ClassicRowGap);
+
+            ServerLayout.Children.Add(grid);
+        }
+
+        /// <summary>Classic: the three overlay buttons side by side, each with its opacity slider underneath.</summary>
+        private void ArrangeOverlayButtonsInOneRow()
+        {
+            var pairs = new[]
+            {
+                new Tuple<Button, Slider>(ShowOverlayButton, RadioOverlayOpacitySlider),
+                new Tuple<Button, Slider>(ShowClientList, ClientListOpacitySlider),
+                new Tuple<Button, Slider>(ShowPilotRoster, PilotRosterOpacitySlider)
+            };
+
+            OverlaysLayout.Children.Clear();
+            var row = new UniformGrid { Columns = pairs.Length, Margin = new Thickness(0, 6, 0, 6) };
+            foreach (var pair in pairs)
+            {
+                ((Panel)pair.Item1.Parent).Children.Remove(pair.Item1);
+                ((Panel)pair.Item2.Parent).Children.Remove(pair.Item2);
+                pair.Item1.Width = ClassicOverlayButtonWidth;
+                pair.Item2.Width = ClassicOverlayButtonWidth;
+                pair.Item2.Margin = new Thickness(0, 4, 0, 0);
+
+                var cell = new StackPanel { Margin = new Thickness(ClassicColumnGap / 2, 0, ClassicColumnGap / 2, 0) };
+                cell.Children.Add(pair.Item1);
+                cell.Children.Add(pair.Item2);
+                row.Children.Add(cell);
+            }
+
+            OverlaysLayout.Children.Add(row);
+        }
+
+        private static void Place(Grid grid, FrameworkElement element, int row, int column, int rowSpan = 1)
+        {
+            (element.Parent as Panel)?.Children.Remove(element);
+            Grid.SetRow(element, row);
+            Grid.SetColumn(element, column);
+            Grid.SetRowSpan(element, rowSpan);
+            grid.Children.Add(element);
+        }
+
+        /// <summary>
+        /// Moves a two-column grid's second column underneath its first (or above it, with secondColumnFirst).
+        /// </summary>
+        private static void StackColumnsVertically(Grid grid, bool secondColumnFirst = false)
+        {
+            if (grid.ColumnDefinitions.Count < 2)
+            {
+                return;
+            }
+
+            grid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+            grid.ColumnDefinitions[1].Width = new GridLength(0);
+            grid.RowDefinitions.Clear();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            foreach (UIElement child in grid.Children)
+            {
+                var column = Grid.GetColumn(child);
+                Grid.SetRow(child, secondColumnFirst ? 1 - column : column);
+                Grid.SetColumn(child, 0);
+            }
+        }
+
         private void InitWeatheringControls()
         {
             _initialisingWeatheringControls = true;
@@ -2018,8 +2256,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
         private void ApplyWeatheringOpacity()
         {
+            // Classic has no weathering; the saved setting is kept for when another theme is chosen.
+            var classic = UiTheme.IsClassicSelected();
             var enabled = _globalSettings.GetClientSettingBool(GlobalSettingsKeys.WeatheringEnabled);
-            var rawOpacity = enabled ? GetWeatheringOpacity() : 0.0;
+            var rawOpacity = enabled && !classic ? GetWeatheringOpacity() : 0.0;
             var opacity = Math.Min(rawOpacity, 1.0);
             var extraOpacity = Math.Max(0.0, rawOpacity - 1.0);
             var overlayOpacity = opacity * 0.5;
@@ -2043,7 +2283,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
 
             if (WeatheringOpacitySlider != null)
             {
-                WeatheringOpacitySlider.IsEnabled = enabled;
+                WeatheringOpacitySlider.IsEnabled = enabled && !classic;
             }
         }
 

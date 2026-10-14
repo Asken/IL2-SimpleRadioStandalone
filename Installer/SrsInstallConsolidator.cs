@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -14,16 +15,28 @@ namespace Installer
     internal sealed class SrsConsolidationPlan
     {
         public SrsConsolidationPlan(string destination, IEnumerable<string> installations)
+            : this(destination, installations, SrsInstallConsolidator.ReadClientVersion)
+        {
+        }
+
+        /// <param name="readClientVersion">Returns the file version of an installation's client exe (tests inject this).</param>
+        internal SrsConsolidationPlan(string destination, IEnumerable<string> installations, Func<string, string> readClientVersion)
         {
             Destination = Path.GetFullPath(destination);
             Installations = installations
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            CiribobInstallations = Installations
+                .Where(path => SrsInstallConsolidator.IsCiribobClientVersion(readClientVersion(path)))
+                .ToList();
         }
 
         public string Destination { get; private set; }
         public List<string> Installations { get; private set; }
+
+        /// <summary>Installations of Ciribob's original IL2-SRS (1.0.2.0 or earlier), found by client version.</summary>
+        public List<string> CiribobInstallations { get; private set; }
 
         public List<string> DuplicateInstallations
         {
@@ -48,6 +61,7 @@ namespace Installer
     internal static class SrsInstallConsolidator
     {
         private const string ClientExecutable = "IL2-SR-ClientRadio.exe";
+        private const string ClassicThemeName = Ciribob.IL2.SimpleRadio.Standalone.Client.Themes.UiTheme.Classic;
         private const string RegistryPath = @"HKEY_CURRENT_USER\SOFTWARE\IL2-SRS";
         private static readonly string[] KnownProgramFiles =
         {
@@ -105,6 +119,43 @@ namespace Installer
             return MigrateUserDataTo(plan, registeredPath, UserDataPath, log);
         }
 
+        /// <summary>
+        /// True when this install upgrades Ciribob's original IL2-SRS and no settings from this fork exist yet,
+        /// so the migrated settings get the Classic theme and English (see ApplyCiribobUpgradeDefaults).
+        /// </summary>
+        public static bool IsCiribobUpgrade(SrsConsolidationPlan plan)
+        {
+            return IsCiribobUpgradeTo(plan, UserDataPath);
+        }
+
+        internal static bool IsCiribobUpgradeTo(SrsConsolidationPlan plan, string userDataPath)
+        {
+            return plan.CiribobInstallations.Count > 0
+                   && !File.Exists(Path.Combine(userDataPath, "global.cfg"));
+        }
+
+        /// <summary>
+        /// Ciribob's releases stamp 1.0.0.x to 1.0.2.0; every release of this fork is 1.0.3.0 or later.
+        /// </summary>
+        internal static bool IsCiribobClientVersion(string fileVersion)
+        {
+            return Version.TryParse(fileVersion, out Version version)
+                   && version < new Version(1, 0, 3, 0);
+        }
+
+        internal static string ReadClientVersion(string installation)
+        {
+            try
+            {
+                string client = Path.Combine(installation, ClientExecutable);
+                return File.Exists(client) ? FileVersionInfo.GetVersionInfo(client).FileVersion : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         internal static SrsConsolidationResult MigrateUserDataTo(
             SrsConsolidationPlan plan,
             string registeredPath,
@@ -112,6 +163,7 @@ namespace Installer
             Action<string> log)
         {
             Directory.CreateDirectory(userDataPath);
+            bool ciribobUpgrade = IsCiribobUpgradeTo(plan, userDataPath);
 
             string migrationMarker = Path.Combine(userDataPath, ".legacy-migration-complete");
             bool migrationAlreadyCompleted = File.Exists(migrationMarker);
@@ -179,6 +231,11 @@ namespace Installer
             }
 
             EnsureGlobalProfileList(targetProfiles, userDataPath);
+            if (ciribobUpgrade)
+            {
+                ApplyCiribobUpgradeDefaults(userDataPath, log);
+            }
+
             File.WriteAllText(
                 migrationMarker,
                 DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
@@ -640,6 +697,45 @@ namespace Installer
             }
 
             return profiles;
+        }
+
+        /// <summary>
+        /// Upgrades from Ciribob's 1.0.2.0 keep its look and language: the Classic theme and English, which this
+        /// fork would otherwise default to Bakelite and the Windows language. Only missing settings are added.
+        /// </summary>
+        private static void ApplyCiribobUpgradeDefaults(string userDataPath, Action<string> log)
+        {
+            string globalPath = Path.Combine(userDataPath, "global.cfg");
+            List<string> lines = File.Exists(globalPath)
+                ? File.ReadAllLines(globalPath).ToList()
+                : new List<string> { "[Client Settings]" };
+
+            bool themeAdded = AddClientSettingIfMissing(lines, "Theme", ClassicThemeName);
+            bool languageAdded = AddClientSettingIfMissing(lines, "Language", "en");
+            File.WriteAllLines(globalPath, lines, Encoding.UTF8);
+
+            Log(log, "Upgrading from IL2-SRS 1.0.2.0: " +
+                     (themeAdded ? "Classic theme" : "theme unchanged") + ", " +
+                     (languageAdded ? "English" : "language unchanged"));
+        }
+
+        private static bool AddClientSettingIfMissing(List<string> lines, string key, string value)
+        {
+            if (lines.Any(line => Regex.IsMatch(line, @"^\s*" + Regex.Escape(key) + @"\s*=", RegexOptions.IgnoreCase)))
+            {
+                return false;
+            }
+
+            int clientSection = lines.FindIndex(line => string.Equals(line.Trim(), "[Client Settings]", StringComparison.OrdinalIgnoreCase));
+            if (clientSection < 0)
+            {
+                lines.Add(string.Empty);
+                lines.Add("[Client Settings]");
+                clientSection = lines.Count - 1;
+            }
+
+            lines.Insert(clientSection + 1, key + "=" + value);
+            return true;
         }
 
         private static void EnsureGlobalProfileList(ISet<string> profiles, string userDataPath)

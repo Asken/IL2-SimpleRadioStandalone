@@ -1,0 +1,85 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Classic: the look of the original IL2-SRS 1.0.2.0 client. Windows use MahApps.Metro's light theme
+         with the steel accent, and the overlay is flat #444 grey with white text, as it was then.
+         Windows skip MilitaryControls.xaml in this theme (see ThemeControlsDictionary), so these
+         brushes mostly colour the overlay and the few window elements that still reference them.
+         Key set must stay identical to MilitaryPalette.xaml. -->
+    <Color x:Key="MilWindowBackgroundColor">#FFFFFF</Color>
+    <Color x:Key="MilChromeColor">#647687</Color>
+    <Color x:Key="MilWellColor">#FFFFFF</Color>
+    <Color x:Key="MilBorderColor">#CCCCCC</Color>
+    <Color x:Key="MilTextPrimaryColor">#000000</Color>
+    <Color x:Key="MilTextSecondaryColor">#7F7F7F</Color>
+    <Color x:Key="MilAccentColor">#647687</Color>
+    <Color x:Key="MilActionColor">#F7F7F7</Color>
+    <Color x:Key="MilActionBorderColor">#CCCCCC</Color>
+    <Color x:Key="MilActionHoverColor">#E0E0E0</Color>
+    <Color x:Key="MilLedOnColor">#00FF00</Color>
+    <Color x:Key="MilLedOffColor">#7F7F7F</Color>
+    <Color x:Key="MilLedErrorColor">#FF0000</Color>
+    <Color x:Key="MilRowAltColor">#F7F7F7</Color>
+
+    <!-- No weathering in this theme; these only need to be valid colours. -->
+    <Color x:Key="MilWornMetal1Color">#CCCCCC</Color>
+    <Color x:Key="MilWornMetal2Color">#D8D8D9</Color>
+    <Color x:Key="MilWornMetal3Color">#E0E0E0</Color>
+
+    <SolidColorBrush x:Key="MilWindowBackgroundBrush" Color="{StaticResource MilWindowBackgroundColor}" />
+    <SolidColorBrush x:Key="MilChromeBrush" Color="{StaticResource MilChromeColor}" />
+    <SolidColorBrush x:Key="MilWellBrush" Color="{StaticResource MilWellColor}" />
+    <SolidColorBrush x:Key="MilBorderBrush" Color="{StaticResource MilBorderColor}" />
+    <SolidColorBrush x:Key="MilTextPrimaryBrush" Color="{StaticResource MilTextPrimaryColor}" />
+    <SolidColorBrush x:Key="MilTextSecondaryBrush" Color="{StaticResource MilTextSecondaryColor}" />
+    <SolidColorBrush x:Key="MilAccentBrush" Color="{StaticResource MilAccentColor}" />
+    <SolidColorBrush x:Key="MilTitleTextBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="MilActionBrush" Color="{StaticResource MilActionColor}" />
+    <SolidColorBrush x:Key="MilActionBorderBrush" Color="{StaticResource MilActionBorderColor}" />
+    <SolidColorBrush x:Key="MilActionHoverBrush" Color="{StaticResource MilActionHoverColor}" />
+    <SolidColorBrush x:Key="MilLedOnBrush" Color="{StaticResource MilLedOnColor}" />
+    <SolidColorBrush x:Key="MilLedOffBrush" Color="{StaticResource MilLedOffColor}" />
+    <SolidColorBrush x:Key="MilLedErrorBrush" Color="{StaticResource MilLedErrorColor}" />
+    <SolidColorBrush x:Key="MilRowAltBrush" Color="{StaticResource MilRowAltColor}" />
+    <SolidColorBrush x:Key="MilVuFaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="MilVuMarkBrush" Color="#333333" />
+    <SolidColorBrush x:Key="MilVuNeedleBrush" Color="#D33124" />
+    <SolidColorBrush x:Key="OverlayTxRxLabelBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OverlayChannelButtonForegroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OverlayChannelButtonSelectedForegroundBrush" Color="#FFFFFF" />
+
+    <!-- Main window status panels (connection status, Combat Box RCI): light, with dark coloured text. -->
+    <SolidColorBrush x:Key="MilStatusIdleBackgroundBrush" Color="#F7F7F7" />
+    <SolidColorBrush x:Key="MilStatusConnectedBackgroundBrush" Color="#EAF6EA" />
+    <SolidColorBrush x:Key="MilStatusErrorBackgroundBrush" Color="#FBEAE8" />
+    <SolidColorBrush x:Key="MilStatusConnectedTextBrush" Color="#007A00" />
+    <SolidColorBrush x:Key="MilStatusErrorTextBrush" Color="#C00000" />
+    <SolidColorBrush x:Key="MilRciInactiveBackgroundBrush" Color="#F7F7F7" />
+    <SolidColorBrush x:Key="MilRciInactiveTextBrush" Color="#7F7F7F" />
+
+    <!-- 1.0.2.0 used the MahApps default font in windows; the overlay sets Courier New itself. -->
+    <FontFamily x:Key="MilFontStencil">Segoe UI</FontFamily>
+    <FontFamily x:Key="MilFontMono">Segoe UI</FontFamily>
+
+    <!-- Flat surfaces: no bevels, screws or lamp glass. -->
+    <SolidColorBrush x:Key="MilPanelFaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="MilBtnDarkFaceBrush" Color="#F7F7F7" />
+    <SolidColorBrush x:Key="MilBtnDarkHoverBrush" Color="#E0E0E0" />
+    <SolidColorBrush x:Key="MilBtnDarkPressedBrush" Color="#CCCCCC" />
+    <SolidColorBrush x:Key="MilBtnBrassFaceBrush" Color="#647687" />
+    <SolidColorBrush x:Key="MilBtnBrassHoverBrush" Color="#7A8B9A" />
+    <SolidColorBrush x:Key="MilBtnBrassPressedBrush" Color="#4C5B6B" />
+    <SolidColorBrush x:Key="MilScrewBrush" Color="Transparent" />
+    <SolidColorBrush x:Key="MilLampBezelBrush" Color="#333333" />
+    <SolidColorBrush x:Key="MilLampGlassBrush" Color="Transparent" />
+
+    <!-- Radio overlay: flat #444 with lighter grey buttons, as in 1.0.2.0. -->
+    <SolidColorBrush x:Key="OverlayEquipmentPanelBrush" Color="#444444" />
+    <SolidColorBrush x:Key="OverlayRaisedControlBrush" Color="#5A5A5A" />
+    <SolidColorBrush x:Key="OverlayPressedControlBrush" Color="#333333" />
+    <SolidColorBrush x:Key="OverlayRaisedBorderBrush" Color="#2B2B2B" />
+    <SolidColorBrush x:Key="OverlayEdgeHighlightBrush" Color="#444444" />
+    <SolidColorBrush x:Key="OverlayAccentRaisedBrush" Color="#647687" />
+    <SolidColorBrush x:Key="OverlayAccentRaisedBorderBrush" Color="#2B2B2B" />
+
+</ResourceDictionary>
