@@ -207,6 +207,132 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Installer
             }
         }
 
+        [TestMethod]
+        public void CiribobVersionsAreTheOnesBelowThisForksFirstRelease()
+        {
+            Assert.IsTrue(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("1.0.2.0"));
+            Assert.IsTrue(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("1.0.1.4"));
+            Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("1.0.3.0"));
+            Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("1.0.4.12"));
+            Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("1.0.5.0"));
+            Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion(null));
+            Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobClientVersion("not a version"));
+        }
+
+        [TestMethod]
+        public void UpgradeFromCiribobKeepsSettingsAndAddsClassicThemeAndEnglish()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-ciribob-" + Guid.NewGuid().ToString("N"));
+            string oldInstall = Path.Combine(root, "old");
+            string userData = Path.Combine(root, "userdata");
+
+            try
+            {
+                Directory.CreateDirectory(oldInstall);
+                Write(Path.Combine(oldInstall, "IL2-SR-ClientRadio.exe"), "dummy");
+                Write(Path.Combine(oldInstall, "global.cfg"),
+                    "[Position Settings]\r\nRadioX=100\r\n\r\n[Client Settings]\r\nSettingsProfiles={default.cfg}\r\nLastSeenName=Pilot\r\nSpeakerBoost=0.7");
+                Write(Path.Combine(oldInstall, "default.cfg"), "[Client Settings]\r\nRadio1Channel=-0.3");
+                Write(Path.Combine(oldInstall, "FavouriteServers.csv"), "Combat Box,srs.combatbox.net:6002,True\r\n");
+
+                var plan = CiribobPlan(oldInstall, "1.0.2.0");
+                Assert.IsTrue(global::Installer.SrsInstallConsolidator.IsCiribobUpgradeTo(plan, userData));
+
+                global::Installer.SrsInstallConsolidator.MigrateUserDataTo(plan, oldInstall, userData, null);
+
+                string globalConfig = File.ReadAllText(Path.Combine(userData, "global.cfg"));
+                StringAssert.Contains(globalConfig, "Theme=Classic");
+                StringAssert.Contains(globalConfig, "Language=en");
+                StringAssert.Contains(globalConfig, "LastSeenName=Pilot");
+                StringAssert.Contains(globalConfig, "SpeakerBoost=0.7");
+                StringAssert.Contains(globalConfig, "RadioX=100");
+                StringAssert.Contains(globalConfig, "SettingsProfiles={default}");
+                Assert.AreEqual("[Client Settings]\r\nRadio1Channel=-0.3", File.ReadAllText(Path.Combine(userData, "default.cfg")));
+                StringAssert.Contains(File.ReadAllText(Path.Combine(userData, "FavouriteServers.csv")), "srs.combatbox.net:6002");
+
+                // Theme and language go in the [Client Settings] section, which SRS reads them from.
+                string clientSection = globalConfig.Substring(globalConfig.IndexOf("[Client Settings]", StringComparison.Ordinal));
+                StringAssert.Contains(clientSection, "Theme=Classic");
+                StringAssert.Contains(clientSection, "Language=en");
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void UpgradeDefaultsNeverReplaceSettingsTheUserAlreadyHas()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-ciribob-" + Guid.NewGuid().ToString("N"));
+            string oldInstall = Path.Combine(root, "old");
+            string userData = Path.Combine(root, "userdata");
+
+            try
+            {
+                Directory.CreateDirectory(oldInstall);
+                Write(Path.Combine(oldInstall, "IL2-SR-ClientRadio.exe"), "dummy");
+                Write(Path.Combine(oldInstall, "global.cfg"),
+                    "[Client Settings]\r\nSettingsProfiles={default}\r\nTheme=Grey\r\nLanguage=de");
+
+                global::Installer.SrsInstallConsolidator.MigrateUserDataTo(
+                    CiribobPlan(oldInstall, "1.0.2.0"), oldInstall, userData, null);
+
+                string globalConfig = File.ReadAllText(Path.Combine(userData, "global.cfg"));
+                StringAssert.Contains(globalConfig, "Theme=Grey");
+                StringAssert.Contains(globalConfig, "Language=de");
+                Assert.IsFalse(globalConfig.Contains("Classic"));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ForkInstallsAndExistingForkSettingsAreNotTreatedAsCiribobUpgrades()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "il2-srs-ciribob-" + Guid.NewGuid().ToString("N"));
+            string install = Path.Combine(root, "install");
+            string userData = Path.Combine(root, "userdata");
+
+            try
+            {
+                Directory.CreateDirectory(install);
+                Directory.CreateDirectory(userData);
+                Write(Path.Combine(install, "IL2-SR-ClientRadio.exe"), "dummy");
+                Write(Path.Combine(install, "global.cfg"), "[Client Settings]\r\nSettingsProfiles={default}");
+
+                // A fork release in the old folder: no Classic default.
+                var forkPlan = CiribobPlan(install, "1.0.4.7");
+                Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobUpgradeTo(forkPlan, userData));
+                global::Installer.SrsInstallConsolidator.MigrateUserDataTo(forkPlan, install, userData, null);
+                Assert.IsFalse(File.ReadAllText(Path.Combine(userData, "global.cfg")).Contains("Theme="));
+
+                // A leftover 1.0.2.0 folder when this fork's settings already exist: theirs are kept as they are.
+                var ciribobPlan = CiribobPlan(install, "1.0.2.0");
+                Assert.IsFalse(global::Installer.SrsInstallConsolidator.IsCiribobUpgradeTo(ciribobPlan, userData));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        private static global::Installer.SrsConsolidationPlan CiribobPlan(string install, string clientVersion)
+        {
+            return new global::Installer.SrsConsolidationPlan(install, new[] { install }, path => clientVersion);
+        }
+
         private static string SelectDefaultInstallPath(string registeredPath, string recommendedPath)
         {
             return global::Installer.SrsInstallConsolidator.SelectDefaultInstallPath(

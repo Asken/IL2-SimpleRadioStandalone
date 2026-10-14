@@ -732,6 +732,12 @@
   <data name="Mute / Unmute Radio 2" xml:space="preserve">
     <value>Приглушить / вернуть радио 2</value>
   </data>
+  <data name="Restart SRS to finish switching to or from the Classic theme." xml:space="preserve">
+    <value>Перезапустите SRS, чтобы завершить переход на тему Classic или с неё.</value>
+  </data>
+  <data name="Restart SRS now?" xml:space="preserve">
+    <value>Перезапустить SRS сейчас?</value>
+  </data>
   <data name="Fit height to pilots" xml:space="preserve">
     <value>Подогнать высоту под пилотов</value>
   </data>

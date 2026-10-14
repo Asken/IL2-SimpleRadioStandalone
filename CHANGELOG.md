@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A **Classic** theme in **Settings > Theme** that brings back the look of the original IL2-SRS 1.0.2.0 client: plain light windows with a steel-blue title bar, standard controls, thin VU bars and light status panels, and a flat grey radio overlay with a green-on-black display. Restart SRS when asked to finish switching to or from Classic. 3D effects, weathering and the VU meter style don't apply to Classic and are greyed out while it is selected; your settings for them are kept. Like 1.0.2.0, the window is a fixed 550 x 610 with the General tab in one column and **Favourites** on its own tab; the other themes keep their layout and remember their own window size. The overlay layout is the same in every theme.
+- Upgrading from the original IL2-SRS 1.0.2.0 (or earlier): the installer now explains what will happen before it starts, keeps your settings, and starts SRS with the Classic theme and in English. Settings you already have from a newer version are never changed.
+
 ## IL2-SRS 1.0.5.0-beta.2
 
 ### Added

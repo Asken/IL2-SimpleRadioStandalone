@@ -210,6 +210,12 @@ namespace Installer
                 }
             }
 
+            if (SrsInstallConsolidator.IsCiribobUpgrade(consolidationPlan) && !ConfirmCiribobUpgrade(consolidationPlan))
+            {
+                RestoreInstallButtons();
+                return;
+            }
+
             _progressBarDialog = new ProgressBarDialog();
             _progressBarDialog.Owner = this;
             _progressBarDialog.Show();
@@ -307,6 +313,27 @@ namespace Installer
         {
             return Environment.GetCommandLineArgs()
                 .Any(arg => string.Equals(arg?.Trim(), expectedArgument, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>Explains an upgrade from Ciribob's original IL2-SRS before anything is changed.</summary>
+        private static bool ConfirmCiribobUpgrade(SrsConsolidationPlan plan)
+        {
+            string folders = string.Join(Environment.NewLine, plan.CiribobInstallations.Select(path => "  " + path));
+            MessageBoxResult result = MessageBox.Show(
+                "This installer found the original IL2-SRS (version 1.0.2.0 or earlier) in:\n\n" + folders + "\n\n" +
+                "Your settings will be kept. Your key bindings, profiles, audio devices and volumes, favourite servers, " +
+                "radio presets and window positions are copied to the new settings folder, %AppData%\\IL2-SRS, and a " +
+                "backup of the old files is saved there under MigrationBackups.\n\n" +
+                "To keep things familiar, SRS will start with the Classic theme, which looks like 1.0.2.0, and in " +
+                "English. You can change both later under Settings.\n\n" +
+                "When SRS first starts, it offers the community's recommended radio settings. Choose No to keep your " +
+                "current settings exactly as they are.\n\n" +
+                "Click OK to install, or Cancel to stop.",
+                "Upgrading from IL2-SRS 1.0.2.0",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Information);
+
+            return result == MessageBoxResult.OK;
         }
 
         private static void LaunchClientAfterAutoUpdate(string installPath)
