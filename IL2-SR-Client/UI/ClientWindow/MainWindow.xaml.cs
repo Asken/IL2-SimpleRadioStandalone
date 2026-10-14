@@ -221,10 +221,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             InitSettingsProfiles();
             ReloadProfile();
             PromptForCommunityRecommendedSettingsOnce();
+            InitRciController();
 
             InitInput();
 
             InitDefaultAddress();
+            ApplyRciServerLock();
 
             InitOverlayOpacitySliders();
             InitWeatheringControls();
@@ -881,7 +883,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             set
             {
                 _serverAddress = value;
-                if (value != null)
+                // An RCI controller stays on Combat Box whichever favourite is selected.
+                if (value != null && !RciControllerMode.IsActive)
                 {
                     ServerIp.Text = value.Address;
                 }
@@ -1248,6 +1251,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             yield return PlayConnectionSounds;
             yield return RequireAdminToggle;
             yield return ShowTransmitterName;
+            yield return RciControllerToggle;
             yield return ThreeDEffectsToggle;
             yield return WeatheringEffectToggle;
             yield return RadioSwitchIsPTT;
@@ -1287,6 +1291,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
                 if (_client != null)
                 {
                     Logger.Info("Connection attempt already in progress; ignoring duplicate connect request");
+                    return;
+                }
+
+                if (!CanConnectAsRciController())
+                {
                     return;
                 }
 
@@ -1501,9 +1510,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
                 ConnectionStatusLamp.Fill = GetConnectionStatusBrush("MilLedOnBrush", Brushes.LimeGreen);
                 ConnectionStatusText.Foreground = GetConnectionStatusBrush("MilLedOnBrush", Brushes.LimeGreen);
                 ConnectionStatusText.Text = LocalizationManager.Get("CONNECTED");
-                ConnectionStatusHint.Text = ClientState.IsGameConnected
-                    ? LocalizationManager.Get("Server and IL-2 active")
-                    : LocalizationManager.Get("Server link established");
+                ConnectionStatusHint.Text = RciControllerMode.IsActive
+                    ? LocalizationManager.Format("RCI controller: {0}", RciControllerMode.RadioName)
+                    : ClientState.IsGameConnected
+                        ? LocalizationManager.Get("Server and IL-2 active")
+                        : LocalizationManager.Get("Server link established");
                 return;
             }
 
@@ -1601,6 +1612,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
         protected override void OnClosing(CancelEventArgs e)
         {
             ClientStateSingleton.Instance.PropertyChanged -= ClientState_PropertyChanged;
+            RciControllerMode.ActiveChanged -= OnRciControllerModeChanged;
             MessageHub.Instance.ClearSubscriptions();
             _il2RadioSyncManager.Stop();
 
@@ -2075,6 +2087,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             string connection = message.SRSAddress;
 
             Logger.Info($"Received AutoConnect IL2-SRS @ {connection}");
+
+            if (ShouldIgnoreAutoConnect(connection))
+            {
+                Logger.Info("Ignoring AutoConnect: RCI Controller mode stays on Combat Box");
+                return;
+            }
 
             if (ClientState.IsConnected)
             {

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **RCI Controller mode** for Combat Box RCI officers, under **Settings > RCI Controller**. It lets an officer use SRS without IL-2: SRS uses the codename from the officer's personal access code (shown to pilots as `CODENAME___RCI`), takes the coalition from the code instead of IL-2, and stays on the Combat Box server. Access codes are issued and signed by the Combat Box RCI dashboard; SRS only holds the public key needed to check them. The first time the mode is used, SRS offers an **RCI Controller** profile with Radio 1 in the left ear and Radio 2 in the right.
+
+### Changed
+
+- An RCI controller no longer counts itself as a friendly RCI, so its own channel 1 is not renamed "RCI Control".
+- RCI controllers no longer appear as pilots in the Pilot Roster; the RCI status panel shows them instead.
+
 ## IL2-SRS 1.0.5.0-beta.2
 
 ### Added

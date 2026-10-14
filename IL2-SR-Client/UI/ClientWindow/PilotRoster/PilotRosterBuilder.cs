@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons;
 using Ciribob.IL2.SimpleRadio.Standalone.Common;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 
@@ -219,7 +220,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.PilotRoster
             }
 
             var normalizedName = Regex.Replace(name, @"[\s\p{Cf}]+", " ").Trim();
-            return !string.Equals(normalizedName, "Axis Airfield", System.StringComparison.OrdinalIgnoreCase) &&
+            // RCI controllers are not pilots; the RCI status panel shows them instead.
+            return !ConnectedClientsSingleton.IsRciName(normalizedName) &&
+                   !string.Equals(normalizedName, "Axis Airfield", System.StringComparison.OrdinalIgnoreCase) &&
                    !string.Equals(normalizedName, "Axis Command", System.StringComparison.OrdinalIgnoreCase) &&
                    !string.Equals(normalizedName, "Allies Airfield", System.StringComparison.OrdinalIgnoreCase) &&
                    !string.Equals(normalizedName, "Allies Command", System.StringComparison.OrdinalIgnoreCase) &&

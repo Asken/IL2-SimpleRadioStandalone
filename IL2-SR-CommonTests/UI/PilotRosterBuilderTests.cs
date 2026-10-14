@@ -137,7 +137,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.UI
                 CreateClient("friendly-7", "UN Commander", "", FriendlyCoalition, 1, 2)
             }).ToList();
 
-            Assert.AreEqual(3, roster.Count);
+            Assert.AreEqual(2, roster.Count);
             Assert.IsFalse(roster.Any(entry => entry.PilotName == "AXIS AIRFIELD"));
             Assert.IsFalse(roster.Any(entry => entry.PilotName == "AXIS COMMAND"));
             Assert.IsFalse(roster.Any(entry => entry.PilotName == "UN AIRFIELD"));
@@ -145,7 +145,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.UI
             Assert.IsFalse(roster.Any(entry => entry.PilotName == "CF AIRFIELD"));
             Assert.IsFalse(roster.Any(entry => entry.PilotName == "CF COMMAND"));
             Assert.IsTrue(roster.Any(entry => entry.PilotName == "-TBAS-HALUTER"));
-            Assert.IsTrue(roster.Any(entry => entry.PilotName == "KRAKEN__RCI"));
+            Assert.IsFalse(roster.Any(entry => entry.PilotName == "KRAKEN__RCI"), "RCI controllers are not pilots.");
             Assert.IsTrue(roster.Any(entry => entry.PilotName == "UN COMMANDER"));
         }
 

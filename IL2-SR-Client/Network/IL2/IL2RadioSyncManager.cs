@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Network.Models;
+using Ciribob.IL2.SimpleRadio.Standalone.Client.Settings;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.Diagnostics;
@@ -55,7 +56,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Network.IL2
             CheckRunningIL2WinWingConfiguration();
 
             //kept current by any UDP traffic from IL2
-            if (!_clientStateSingleton.PlayerGameState.IsCurrent())
+            // An RCI controller has no IL-2 running: resetting would send coalition 0 to the server every 5 s.
+            if (ShouldResetRadioState(_clientStateSingleton.PlayerGameState.IsCurrent(), RciControllerMode.IsActive))
             {
                 _clientStateSingleton.PlayerGameState.LastUpdate = -1;
                 Logger.Info("Reset Radio state - IL2 not running");
@@ -65,6 +67,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Network.IL2
 
                 MessageHub.Instance.Publish(new PlayerStateUpdate());
             }
+        }
+
+        internal static bool ShouldResetRadioState(bool telemetryCurrent, bool rciControllerActive)
+        {
+            return !telemetryCurrent && !rciControllerActive;
         }
 
         private void CheckRunningIL2WinWingConfiguration()
