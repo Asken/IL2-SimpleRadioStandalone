@@ -36,6 +36,16 @@ The installer can consolidate older duplicate SRS installations. It preserves pr
 
 Use the recommended Program Files installation as the copy you keep. Do not manually merge configuration files unless consolidation reports a conflict.
 
+## Upgrading from the original IL2-SRS 1.0.2.0
+
+The original 1.0.2.0 updater cannot update to this version, so download and run the updater above. When the installer finds a 1.0.2.0 (or earlier) installation, it explains the upgrade before it starts:
+
+- Your key bindings, profiles, audio devices and volumes, favourite servers, radio presets and window positions are copied to `%AppData%\IL2-SRS`, with a backup of the old files under `MigrationBackups`.
+- SRS starts with the **Classic** theme, which looks like 1.0.2.0, and in English. You can change both later under **Settings**.
+- On first start, SRS offers the community's recommended radio settings. Choose **No** to keep your current settings exactly as they are.
+
+This only happens the first time: if you have already used a newer version on this PC, your existing settings are kept unchanged.
+
 ## First launch
 
 On startup, SRS checks the telemetry configuration for both games if they are installed. If a required `startup.cfg` change cannot be made, the client displays a warning instead of silently continuing.

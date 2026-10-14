@@ -1,6 +1,7 @@
 <controls:MetroWindow x:Class="Ciribob.IL2.SimpleRadio.Standalone.Client.UI.MainWindow"
                       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:themes="clr-namespace:Ciribob.IL2.SimpleRadio.Standalone.Client.Themes"
                       xmlns:clientWindow="clr-namespace:Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow"
                       xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -28,7 +29,7 @@
     <controls:MetroWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/IL2-SR-ClientRadio;component/Themes/MilitaryControls.xaml" />
+                <themes:ThemeControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
             <converters:MicAvailabilityTooltipConverter x:Key="MicAvailabilityTooltipConverter" />
             <converters:BooleanToLedBrushConverter x:Key="LedBrushConverter" />
@@ -41,7 +42,7 @@
                        VerticalAlignment="Center"
                        FontFamily="{StaticResource MilFontStencil}"
                        FontSize="17"
-                       Foreground="{DynamicResource MilAccentBrush}"
+                       Foreground="{DynamicResource MilTitleTextBrush}"
                        Text="{Binding Converter={StaticResource MilUpperConverter}}" />
         </DataTemplate>
     </controls:MetroWindow.TitleTemplate>
@@ -114,15 +115,15 @@
         <TabControl x:Name="TabControl">
         <TabItem Header="General">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="10,0">
-                    <Grid>
+                <StackPanel x:Name="GeneralLayout" Margin="10,0">
+                    <Grid x:Name="AudioGroupsGrid">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <GroupBox Grid.Column="0" Header="Microphone">
-                            <Grid>
+                            <Grid x:Name="MicrophoneGrid">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -199,14 +200,14 @@
                         </GroupBox>
                     </Grid>
 
-                    <Grid>
+                    <Grid x:Name="ServerOverlaysGrid">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <GroupBox Grid.Column="0" Header="Server">
-                            <StackPanel HorizontalAlignment="Center">
+                            <StackPanel x:Name="ServerLayout" HorizontalAlignment="Center">
                                 <ComboBox x:Name="ServerAddressPicker"
                                           Width="220"
                                           Height="28"
@@ -228,16 +229,16 @@
                                         BorderThickness="1">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#2B251B" />
+                                            <Setter Property="Background" Value="{DynamicResource MilStatusIdleBackgroundBrush}" />
                                             <Setter Property="BorderBrush" Value="{DynamicResource MilLedOffBrush}" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding ClientState.IsConnected}" Value="True">
-                                                    <Setter Property="Background" Value="#20301C" />
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource MilLedOnBrush}" />
+                                                    <Setter Property="Background" Value="{DynamicResource MilStatusConnectedBackgroundBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource MilStatusConnectedTextBrush}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding ClientState.IsConnectionErrored}" Value="True">
-                                                    <Setter Property="Background" Value="#321C18" />
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource MilLedErrorBrush}" />
+                                                    <Setter Property="Background" Value="{DynamicResource MilStatusErrorBackgroundBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource MilStatusErrorTextBrush}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -282,11 +283,11 @@
                                                         <Setter Property="Text" Value="DISCONNECTED" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding ClientState.IsConnected}" Value="True">
-                                                                <Setter Property="Foreground" Value="{DynamicResource MilLedOnBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource MilStatusConnectedTextBrush}" />
                                                                 <Setter Property="Text" Value="CONNECTED" />
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding ClientState.IsConnectionErrored}" Value="True">
-                                                                <Setter Property="Foreground" Value="{DynamicResource MilLedErrorBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource MilStatusErrorTextBrush}" />
                                                                 <Setter Property="Text" Value="CONNECTION ERROR" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -330,7 +331,8 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <Grid Grid.Column="1"
+                        <Grid x:Name="OverlaysColumn"
+                              Grid.Column="1"
                               Margin="0,5,0,5">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
@@ -338,7 +340,8 @@
                             </Grid.RowDefinitions>
 
                             <GroupBox Grid.Row="0" Header="Overlays" Margin="0">
-                                <StackPanel HorizontalAlignment="Center"
+                                <StackPanel x:Name="OverlaysLayout"
+                                            HorizontalAlignment="Center"
                                             VerticalAlignment="Center">
                                     <Grid Width="330" Margin="0,8,0,8">
                                         <Grid.ColumnDefinitions>
@@ -418,7 +421,7 @@
                                     <Grid Width="220"
                                           Height="18">
                                         <Border x:Name="RciStatusIndicator"
-                                                Background="#444"
+                                                Background="{DynamicResource MilRciInactiveBackgroundBrush}"
                                                 BorderBrush="#666"
                                                 BorderThickness="1" />
                                         <TextBlock x:Name="RciStatusLabel"
@@ -427,7 +430,7 @@
                                                    FontFamily="Courier New"
                                                    FontSize="12"
                                                    FontWeight="Bold"
-                                                   Foreground="#E7E7E7"
+                                                   Foreground="{DynamicResource MilRciInactiveTextBrush}"
                                                    Text="RCI" />
                                     </Grid>
                                     <TextBlock x:Name="RciCallsignLabel"
@@ -445,7 +448,7 @@
                             </GroupBox>
                         </Grid>
                     </Grid>
-                    <GroupBox Header="Favourites">
+                    <GroupBox x:Name="FavouritesGroupBox" Header="Favourites">
                         <clientWindow:FavouriteServersView DataContext="{Binding Path=FavouriteServersViewModel}" MaxHeight="230" />
                     </GroupBox>
 
@@ -457,7 +460,7 @@
             <GroupBox x:Name="ControlsGroupBox" Header="Controls">
 
                 <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Visible">
-                    <StackPanel HorizontalAlignment="Center">
+                    <StackPanel x:Name="ControlsLayout" HorizontalAlignment="Center">
                         <Button Width="320"
                                 Padding="10,4"
                                 HorizontalAlignment="Center"
@@ -730,7 +733,7 @@
 
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="390" />
+                                <ColumnDefinition x:Name="GlobalSettingsLabelColumn" Width="390" />
                                 <ColumnDefinition />
 
                             </Grid.ColumnDefinitions>
@@ -1018,7 +1021,7 @@
                     <GroupBox Header="RCI Controller">
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="390" />
+                                <ColumnDefinition x:Name="RciControllerLabelColumn" Width="390" />
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -1079,7 +1082,7 @@
                     <GroupBox Header="Audio Options">
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="390" />
+                                <ColumnDefinition x:Name="AudioOptionsLabelColumn" Width="390" />
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>

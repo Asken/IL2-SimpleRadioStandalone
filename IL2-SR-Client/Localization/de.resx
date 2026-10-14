@@ -732,6 +732,12 @@
   <data name="Mute / Unmute Radio 2" xml:space="preserve">
     <value>Funkgerät 2 Stummschaltung ein/aus</value>
   </data>
+  <data name="Restart SRS to finish switching to or from the Classic theme." xml:space="preserve">
+    <value>Starten Sie SRS neu, um den Wechsel zum oder vom Classic-Design abzuschließen.</value>
+  </data>
+  <data name="Restart SRS now?" xml:space="preserve">
+    <value>SRS jetzt neu starten?</value>
+  </data>
   <data name="RCI Controller" xml:space="preserve">
     <value>RCI-Controller</value>
   </data>

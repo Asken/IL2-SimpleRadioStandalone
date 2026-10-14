@@ -732,6 +732,12 @@
   <data name="Mute / Unmute Radio 2" xml:space="preserve">
     <value>Mute / Unmute Radio 2</value>
   </data>
+  <data name="Restart SRS to finish switching to or from the Classic theme." xml:space="preserve">
+    <value>Restart SRS to finish switching to or from the Classic theme.</value>
+  </data>
+  <data name="Restart SRS now?" xml:space="preserve">
+    <value>Restart SRS now?</value>
+  </data>
   <data name="RCI Controller" xml:space="preserve">
     <value>RCI Controller</value>
   </data>
