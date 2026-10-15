@@ -1463,7 +1463,7 @@
 
         <TabItem Header="Help">
             <GroupBox Header="Help &amp; About">
-                <DockPanel>
+                <DockPanel x:Name="HelpLayout" SizeChanged="HelpLayout_SizeChanged">
                     <StackPanel DockPanel.Dock="Bottom"
                                 Margin="0,10,0,4"
                                 HorizontalAlignment="Center">
@@ -1472,29 +1472,31 @@
                                   HorizontalAlignment="Center"
                                   IsChecked="True"
                                   Content="Redact personal details in diagnostics" />
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center">
+                        <!-- One row of four when there is room, otherwise two rows of two (see HelpLayout_SizeChanged). -->
+                        <UniformGrid x:Name="HelpButtonsGrid"
+                                     Columns="4"
+                                     HorizontalAlignment="Center">
                             <Button MinWidth="170"
-                                    Margin="0,0,8,0"
+                                    Margin="6,3"
                                     Padding="10,4"
                                     Click="OpenTelemetryDiagnostics_OnClick"
                                     Content="Telemetry Diagnostics" />
                             <Button MinWidth="170"
-                                    Margin="8,0,8,0"
+                                    Margin="6,3"
                                     Padding="10,4"
                                     Click="ReportProblem_OnClick"
                                     Content="Report a Problem" />
                             <Button MinWidth="170"
-                                    Margin="8,0,8,0"
+                                    Margin="6,3"
                                     Padding="10,4"
                                     Click="SuggestImprovement_OnClick"
                                     Content="Suggest an Improvement" />
                             <Button MinWidth="170"
-                                    Margin="8,0,0,0"
+                                    Margin="6,3"
                                     Padding="10,4"
                                     Click="Donate_OnClick"
                                     Content="Patreon - Support SRS" />
-                        </StackPanel>
+                        </UniformGrid>
                     </StackPanel>
                     <FlowDocumentScrollViewer VerticalScrollBarVisibility="Auto">
                     <FlowDocument x:Name="AboutFlowDocument"

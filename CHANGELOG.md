@@ -13,6 +13,10 @@
 - An RCI controller no longer counts itself as a friendly RCI, so its own channel 1 is not renamed "RCI Control".
 - RCI controllers no longer appear as pilots in the Pilot Roster; the RCI status panel shows them instead.
 
+### Fixed
+
+- The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
+
 ## IL2-SRS 1.0.5.0-beta.2
 
 ### Added
