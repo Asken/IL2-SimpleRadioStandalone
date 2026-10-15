@@ -2179,6 +2179,29 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.UI
             ServerLayout.Children.Add(grid);
         }
 
+        /// <summary>
+        /// The four Help tab buttons go in one row when they fit the window, otherwise in two rows of two.
+        /// </summary>
+        private void HelpLayout_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            HelpButtonsGrid.Columns = ChooseHelpButtonColumns(MeasureHelpButtonsInOneRow(), HelpLayout.ActualWidth);
+        }
+
+        private double MeasureHelpButtonsInOneRow()
+        {
+            var columns = HelpButtonsGrid.Columns;
+            HelpButtonsGrid.Columns = HelpButtonsGrid.Children.Count;
+            HelpButtonsGrid.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var width = HelpButtonsGrid.DesiredSize.Width;
+            HelpButtonsGrid.Columns = columns;
+            return width;
+        }
+
+        internal static int ChooseHelpButtonColumns(double oneRowWidth, double availableWidth)
+        {
+            return oneRowWidth <= availableWidth ? 4 : 2;
+        }
+
         /// <summary>Classic: the three overlay buttons side by side, each with its opacity slider underneath.</summary>
         private void ArrangeOverlayButtonsInOneRow()
         {
