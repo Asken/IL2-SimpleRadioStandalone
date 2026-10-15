@@ -39,6 +39,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Common.Tests.Singletons
         }
 
         [TestMethod]
+        public void AnRciControllerDoesNotCountItselfAsAFriendlyRci()
+        {
+            AddClient(ClientStateSingleton.Instance.ShortGUID, "MAGIC___RCI", FriendlyCoalition);
+
+            Assert.AreEqual(RciStatus.None, ConnectedClientsSingleton.Instance.GetRciStatus(FriendlyCoalition));
+
+            AddClient("other-rci", "SPYGLASS___RCI", FriendlyCoalition);
+
+            Assert.AreEqual(RciStatus.FriendlyOnly, ConnectedClientsSingleton.Instance.GetRciStatus(FriendlyCoalition));
+            Assert.AreEqual("SPYGLASS", ConnectedClientsSingleton.Instance.GetFriendlyRciCallsign(FriendlyCoalition));
+        }
+
+        [TestMethod]
         public void RciPrefixNameIsDetectedAndTrimmed()
         {
             AddClient("friendly-rci", "_RCI_DEFCON", FriendlyCoalition);

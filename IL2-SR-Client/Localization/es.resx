@@ -738,6 +738,63 @@
   <data name="Restart SRS now?" xml:space="preserve">
     <value>¿Reiniciar SRS ahora?</value>
   </data>
+  <data name="RCI Controller" xml:space="preserve">
+    <value>Controlador RCI</value>
+  </data>
+  <data name="RCI Controller mode" xml:space="preserve">
+    <value>Modo controlador RCI</value>
+  </data>
+  <data name="Access code" xml:space="preserve">
+    <value>Código de acceso</value>
+  </data>
+  <data name="Use code" xml:space="preserve">
+    <value>Usar código</value>
+  </data>
+  <data name="Paste your personal access code from the Combat Box RCI dashboard." xml:space="preserve">
+    <value>Pegue su código de acceso personal del panel RCI de Combat Box.</value>
+  </data>
+  <data name="RCI Controller mode is off for now: {0}" xml:space="preserve">
+    <value>El modo controlador RCI está desactivado por ahora: {0}</value>
+  </data>
+  <data name="Paste a new access code under Settings &gt; RCI Controller." xml:space="preserve">
+    <value>Pegue un código de acceso nuevo en Ajustes &gt; Controlador RCI.</value>
+  </data>
+  <data name="Cannot connect as an RCI controller: {0}" xml:space="preserve">
+    <value>No se puede conectar como controlador RCI: {0}</value>
+  </data>
+  <data name="Paste a new access code under Settings &gt; RCI Controller, or switch RCI Controller mode off." xml:space="preserve">
+    <value>Pegue un código de acceso nuevo en Ajustes &gt; Controlador RCI o desactive el modo controlador RCI.</value>
+  </data>
+  <data name="Active as {0} ({1}) until {2}." xml:space="preserve">
+    <value>Activo como {0} ({1}) hasta {2}.</value>
+  </data>
+  <data name="Allies" xml:space="preserve">
+    <value>Aliados</value>
+  </data>
+  <data name="Axis" xml:space="preserve">
+    <value>Eje</value>
+  </data>
+  <data name="Switch on to use SRS as a Combat Box RCI controller without IL-2. You need a personal access code from the RCI dashboard." xml:space="preserve">
+    <value>Actívelo para usar SRS como controlador RCI de Combat Box sin IL-2. Necesita un código de acceso personal del panel RCI.</value>
+  </data>
+  <data name="This version of SRS cannot check RCI access codes yet." xml:space="preserve">
+    <value>Esta versión de SRS aún no puede comprobar códigos de acceso RCI.</value>
+  </data>
+  <data name="Your access code has expired. Get a new one from the RCI dashboard." xml:space="preserve">
+    <value>Su código de acceso ha caducado. Obtenga uno nuevo en el panel RCI.</value>
+  </data>
+  <data name="That access code was not issued by the Combat Box RCI dashboard." xml:space="preserve">
+    <value>Ese código de acceso no lo ha emitido el panel RCI de Combat Box.</value>
+  </data>
+  <data name="That is not a valid access code. Copy it again from the RCI dashboard." xml:space="preserve">
+    <value>No es un código de acceso válido. Cópielo de nuevo del panel RCI.</value>
+  </data>
+  <data name="Create an &quot;RCI Controller&quot; profile with your current key bindings, Radio 1 in your left ear and Radio 2 in your right?" xml:space="preserve">
+    <value>¿Crear un perfil "RCI Controller" con sus controles actuales, la radio 1 en el oído izquierdo y la radio 2 en el derecho?</value>
+  </data>
+  <data name="RCI controller: {0}" xml:space="preserve">
+    <value>Controlador RCI: {0}</value>
+  </data>
   <data name="Fit height to pilots" xml:space="preserve">
     <value>Ajustar la altura a los pilotos</value>
   </data>

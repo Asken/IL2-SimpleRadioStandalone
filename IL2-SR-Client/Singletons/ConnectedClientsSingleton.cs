@@ -97,7 +97,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons
             foreach (var client in _clients)
             {
                 var srClient = client.Value;
-                if (srClient == null || !TryGetRciCallsign(srClient.Name, out var callsign))
+                // An RCI controller does not count itself (it would otherwise always see a friendly RCI).
+                if (srClient == null || srClient.ClientGuid == _guid || !TryGetRciCallsign(srClient.Name, out var callsign))
                 {
                     continue;
                 }
@@ -177,6 +178,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons
         private static double GetAgeSeconds(long ticks)
         {
             return ticks <= 0 ? -1 : new TimeSpan(DateTime.Now.Ticks - ticks).TotalSeconds;
+        }
+
+        /// <summary>True for an RCI controller's name, such as MAGIC___RCI or RCI_MAGIC.</summary>
+        internal static bool IsRciName(string name)
+        {
+            return TryGetRciCallsign(name, out _);
         }
 
         private static bool TryGetRciCallsign(string name, out string callsign)

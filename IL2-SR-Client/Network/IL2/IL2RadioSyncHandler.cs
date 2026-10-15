@@ -153,15 +153,17 @@ So if someone on Server has ParentID!=-1 but ParentID=12345 - this means that in
             {   //Just set the Client
 
                 var playerName = dataMessage.PlayerName?.Trim();
+                // An RCI controller keeps its codename, so IL-2's pilot name is neither compared nor saved.
+                var useGameName = !RciControllerMode.IsActive && !string.IsNullOrWhiteSpace(playerName);
                 update = playerRadioInfo.unitId != dataMessage.ClientID ||
-                         (!string.IsNullOrWhiteSpace(playerName) &&
+                         (useGameName &&
                           !string.Equals(playerName, _clientStateSingleton.LastSeenName, StringComparison.Ordinal));
 
                 playerRadioInfo.unitId = dataMessage.ClientID;
 
                 Logger.Debug($"ClientID {dataMessage.ClientID}");
 
-                if (!string.IsNullOrWhiteSpace(playerName))
+                if (useGameName)
                 {
                     _clientStateSingleton.LastSeenName = playerName;
                 }
@@ -171,7 +173,7 @@ So if someone on Server has ParentID!=-1 but ParentID=12345 - this means that in
                 Logger.Info($"Coalition Update {controlDataMessage.Coalition}");
                 Logger.Info($"ParentVehicleClientID {controlDataMessage.ParentVehicleClientID}");
                 update = ApplyControlData(playerRadioInfo, controlDataMessage.ParentVehicleClientID,
-                    controlDataMessage.Coalition);
+                    controlDataMessage.Coalition, RciControllerMode.IsActive ? RciControllerMode.Coalition : (short?)null);
             }
             else if (message is SRSAddressMessage srs)
             {
@@ -204,12 +206,14 @@ So if someone on Server has ParentID!=-1 but ParentID=12345 - this means that in
             return !string.Equals(lastPublishedName, currentName, StringComparison.Ordinal);
         }
 
+        /// <param name="controllerCoalition">An RCI controller's coalition, which replaces the one IL-2 reports.</param>
         internal static bool ApplyControlData(PlayerGameState playerRadioInfo, int parentVehicleClientId,
-            short reportedCoalition)
+            short reportedCoalition, short? controllerCoalition = null)
         {
-            var coalition = reportedCoalition > 2
-                ? (short)(reportedCoalition - 2)
-                : reportedCoalition;
+            var coalition = controllerCoalition
+                            ?? (reportedCoalition > 2
+                                ? (short)(reportedCoalition - 2)
+                                : reportedCoalition);
             var vehicleId = coalition == 0 ? -1 : parentVehicleClientId;
             var changed = playerRadioInfo.vehicleId != vehicleId || playerRadioInfo.coalition != coalition;
 

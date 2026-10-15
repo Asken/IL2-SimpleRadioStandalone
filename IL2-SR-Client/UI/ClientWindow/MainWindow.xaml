@@ -1018,6 +1018,67 @@
                         </Grid>
 
                     </GroupBox>
+                    <GroupBox Header="RCI Controller">
+                        <Grid HorizontalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="RciControllerLabelColumn" Width="390" />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition />
+                                <RowDefinition />
+                            </Grid.RowDefinitions>
+
+                            <Label Grid.Row="0"
+                                   Grid.Column="0"
+                                   HorizontalContentAlignment="Center"
+                                   VerticalContentAlignment="Center"
+                                   Content="RCI Controller mode" />
+
+                            <ToggleButton Name="RciControllerToggle"
+                                          Grid.Row="0"
+                                          Grid.Column="1"
+                                          HorizontalContentAlignment="Center"
+                                          VerticalContentAlignment="Center"
+                                          Click="RciControllerToggle_Click" />
+
+                            <Label Grid.Row="1"
+                                   Grid.Column="0"
+                                   HorizontalContentAlignment="Center"
+                                   VerticalContentAlignment="Center"
+                                   Content="Access code" />
+
+                            <Grid Grid.Row="1"
+                                  Grid.Column="1"
+                                  Margin="0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="RciAccessCodeBox"
+                                         Grid.Column="0"
+                                         MaxLines="1"
+                                         ToolTip="Paste your personal access code from the Combat Box RCI dashboard." />
+                                <Button x:Name="RciUseCodeButton"
+                                        Grid.Column="1"
+                                        Margin="6,0,0,0"
+                                        Padding="10,0"
+                                        Click="RciUseCodeButton_Click"
+                                        Content="Use code" />
+                            </Grid>
+
+                            <TextBlock x:Name="RciControllerStatusText"
+                                       Grid.Row="2"
+                                       Grid.ColumnSpan="2"
+                                       MaxWidth="560"
+                                       Margin="0,4,0,6"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource MilTextSecondaryBrush}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </GroupBox>
                     <GroupBox Header="Audio Options">
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
