@@ -17,6 +17,10 @@
     <InternalsVisibleTo Include="IL2-SRS-Server-Web.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\IL2-SRS-Server-Abstractions\IL2-SRS-Server-Abstractions.csproj" />
+  </ItemGroup>
+
   <!-- IL2-SR-Common stays a .NET Framework project for the WPF client; compile its portable sources here. -->
   <ItemGroup>
     <Compile Include="..\IL2-SR-Common\**\*.cs"
@@ -41,7 +45,6 @@
     <PackageReference Include="NLog" Version="6.2.1" />
     <PackageReference Include="NLog.Web.AspNetCore" Version="6.2.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.13" />
-    <PackageReference Include="Scriban" Version="7.5.0" />
     <!-- Only used to import server.cfg from the WPF server; 3.x is the version that wrote those files. -->
     <PackageReference Include="sharpconfig" Version="3.2.9.1" />
   </ItemGroup>

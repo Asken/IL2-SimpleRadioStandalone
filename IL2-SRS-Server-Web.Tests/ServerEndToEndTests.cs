@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -25,6 +26,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
     /// Starts the real server (admin web host, SRS TCP and UDP listeners, SQLite) on free ports
     /// and talks to it the way an SRS client and an API consumer would.
     /// </summary>
+    [Collection(ServerCollection.Name)]
     public class ServerEndToEndTests : IAsyncLifetime
     {
         private const string ClientGuid = "EndToEndClientGuid0001";
@@ -48,7 +50,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 "--SRS_SERVER_PORT=" + _srsPort
             }), builder =>
             {
-                // What a host building on the server does: add an action and an admin link.
+                // What a host building on the server does: compile in a plugin, add an action and an admin link.
+                builder.AddServerPlugin(new IntegrationsPlugin());
                 builder.Services.AddSingleton(_action);
                 builder.Services.AddIntegrationAction<RecordingAction>();
                 builder.Services.AddAdminNavItem("workflows", "Workflows");
@@ -300,7 +303,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.True(page.IsSuccessStatusCode);
         }
 
-        private static HttpRequestMessage Authorized(HttpMethod method, string path, string key)
+        internal static HttpRequestMessage Authorized(HttpMethod method, string path, string key)
         {
             var request = new HttpRequestMessage(method, path);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
@@ -322,7 +325,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             return JsonDocument.Parse(line).RootElement.Clone();
         }
 
-        private static int FindFreePort()
+        internal static int FindFreePort()
         {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();

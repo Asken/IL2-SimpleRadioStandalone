@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Components.Integrations;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Components;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

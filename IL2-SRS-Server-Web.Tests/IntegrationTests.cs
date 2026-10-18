@@ -215,9 +215,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             return reader.ReadToEnd();
         }
 
-        internal static (IntegrationStore, SrsDatabase) CreateStore(TempDirectory temp)
+        internal static (IntegrationStore, IntegrationDatabase) CreateStore(TempDirectory temp)
         {
-            var database = temp.CreateDatabase();
+            var database = temp.CreateIntegrationDatabase();
             var protector = new SecretProtector(new EphemeralDataProtectionProvider());
             return (new IntegrationStore(database, protector, new IIntegrationAction[] { new RecordingAction() }), database);
         }
@@ -359,13 +359,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 action.Runs.Select(r => EventData.AsText(EventData.Resolve(r.Data, "event.type"))));
         }
 
+        /// <summary>The server's event types and the plugin's, as a server running the plugin has them.</summary>
+        internal static readonly EventTypeRegistry EventTypes =
+            new(new[] { new EventTypeRegistration(IntegrationEventTypes.All) });
+
         internal static (IntegrationService, ServerEvents, RecordingAction) Create(TempDirectory temp)
         {
             var action = new RecordingAction();
-            var store = new IntegrationStore(temp.CreateDatabase(), new SecretProtector(new EphemeralDataProtectionProvider()),
+            var store = new IntegrationStore(temp.CreateIntegrationDatabase(), new SecretProtector(new EphemeralDataProtectionProvider()),
                 new IIntegrationAction[] { action });
             var events = new ServerEvents();
-            return (new IntegrationService(store, events, new IIntegrationAction[] { action }), events, action);
+            return (new IntegrationService(store, events, new IIntegrationAction[] { action }, EventTypes), events, action);
         }
     }
 
@@ -377,7 +381,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             Save(service, "Red joins", new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Red"));
             Save(service, "Blue joins", new IntegrationCondition("client.coalitionName", ConditionOperator.Is, "Blue"));
             var disabled = Save(service, "Disabled");
@@ -398,7 +402,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             Assert.Null(service.Save(IntegrationStoreTests.Integration(new JsonObject { ["token"] = "t" }, name: "Status",
                 trigger: "server.started,server.stopped"), "admin", out var saved));
             Assert.Equal(new[] { "server.started", "server.stopped" }, service.Store.Get(saved.Id).TriggerTypes);
@@ -417,7 +421,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             Save(service, "Status", retryMode: RetryMode.Fixed, maxRetries: 3);
             var other = Save(service, "Zulu");
             action.Results.Enqueue(IntegrationResult.Retry("Bad gateway"));
@@ -438,7 +442,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             Save(service, "Joins");
 
             events.Publish(Connected());
@@ -455,7 +459,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             var integration = Save(service, "Flaky", retryMode: RetryMode.Exponential, maxRetries: 1);
             action.Results.Enqueue(IntegrationResult.Retry("Service unavailable"));
             action.Results.Enqueue(IntegrationResult.Retry("Still unavailable", TimeSpan.FromMinutes(5)));
@@ -481,7 +485,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             var integration = Save(service, "Status");
             dispatcher.Match(Connected());
 
@@ -498,7 +502,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             Save(service, "No retries");
             action.Results.Enqueue(IntegrationResult.Defer("Slow down", TimeSpan.FromSeconds(20)));
             dispatcher.Match(Connected());
@@ -520,7 +524,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var temp = new TempDirectory();
             var (service, events, action) = IntegrationServiceTests.Create(temp);
             var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
-                new AuditRetention());
+                service.EventTypes, new AuditRetention());
             var integration = Save(service, "Joins", retryMode: RetryMode.Fixed, maxRetries: 3);
 
             dispatcher.Match(Connected());

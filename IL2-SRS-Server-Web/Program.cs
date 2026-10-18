@@ -10,8 +10,8 @@ using Ciribob.IL2.SimpleRadio.Standalone.Server.Components;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -39,9 +39,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
         public static int Main(string[] args) => Run(args);
 
         /// <summary>
-        /// Runs the server. Hosts that build on it (for example to add integration actions or admin pages, see
-        /// <see cref="ServerExtensions"/>) call this from their own Main with <paramref name="configure"/>,
-        /// which runs after the server's own services are registered.
+        /// Runs the server. Hosts that build on it (for example to compile plugins in with
+        /// <see cref="ServerPlugins.AddServerPlugin"/>) call this from their own Main with <paramref name="configure"/>,
+        /// which runs after the server's own services are registered and the plugin folders are loaded.
         /// </summary>
         public static int Run(string[] args, Action<WebApplicationBuilder> configure = null)
         {
@@ -131,27 +131,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
 
             builder.Services.AddSingleton(adminAuth);
             builder.Services.AddSingleton<ServerEvents>();
+            builder.Services.AddSingleton<IEventBus>(services => services.GetRequiredService<ServerEvents>());
+            builder.Services.AddSingleton<IServerStatusEvents>(services => services.GetRequiredService<ServerEvents>());
+            builder.Services.AddSingleton<IEventTypeRegistry, EventTypeRegistry>();
             builder.Services.AddSingleton<ServerState>();
             builder.Services.AddSingleton<ClientEventRecorder>();
             builder.Services.AddSingleton<ServerAdminService>();
-            builder.Services.AddSingleton<SecretProtector>();
             builder.Services.AddSingleton<ServerIdentity>();
-            builder.Services.AddSingleton<IntegrationStore>();
-            builder.Services.AddSingleton<IntegrationService>();
-            builder.Services.AddSingleton<IntegrationDispatcher>();
-            // Hosted services stop in reverse order: the audit log and the integration dispatcher are registered
-            // before the SRS server so they stop after it and still handle the server.stopped event.
+            builder.Services.AddSingleton<IServerInfo>(services => services.GetRequiredService<ServerIdentity>());
+            builder.Services.AddSingleton<IAdminActor, AdminActor>();
+            // Hosted services start in order and stop in reverse: the audit log first, so it stops last and stores
+            // the shutdown events; the SRS server last (below, after the plugins), so plugins see it start and stop.
             builder.Services.AddHostedService(services => services.GetRequiredService<AuditLog>());
-            builder.Services.AddHostedService(services => services.GetRequiredService<IntegrationDispatcher>());
-            builder.Services.AddHostedService<SrsServerHostedService>();
-            builder.Services.AddSingleton<WebhookRateLimiter>();
-            builder.Services.AddHttpClient(WebhookHttp.ClientName, client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(20);
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("IL2-SRS-Server/" + Common.Network.ReleaseMetadata.Version);
-            });
-            builder.Services.AddIntegrationAction<DiscordWebhookAction>();
-            builder.Services.AddIntegrationAction<HttpWebhookAction>();
 
             // Keep login cookies valid across restarts.
             builder.Services.AddDataProtection()
@@ -193,7 +184,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
+            ServerPlugins.Catalog(builder.Services);
+            ServerPlugins.LoadFromFolders(builder);
             configure?.Invoke(builder);
+            builder.Services.AddHostedService<SrsServerHostedService>();
 
             var app = builder.Build();
 
@@ -209,6 +203,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             app.UseAuthorization();
             app.UseRateLimiter();
             app.UseAntiforgery();
+            ServerPlugins.UseStaticFiles(app);
 
             // Named explicitly so the manifest is found when another assembly (e.g. tests) is the entry point.
             var staticAssetsManifest = Path.Combine(AppContext.BaseDirectory,

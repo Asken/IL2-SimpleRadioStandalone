@@ -5,9 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {
@@ -55,21 +54,25 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
     {
         public static readonly TimeSpan ActionTimeout = TimeSpan.FromSeconds(30);
 
-        private readonly ServerEvents _events;
-        private readonly ServerIdentity _identity;
+        private readonly IEventBus _events;
+        private readonly IServerInfo _identity;
         private readonly Dictionary<string, IIntegrationAction> _actions;
 
-        public IntegrationService(IntegrationStore store, ServerEvents events, IEnumerable<IIntegrationAction> actions,
-            ServerIdentity identity = null)
+        public IntegrationService(IntegrationStore store, IEventBus events, IEnumerable<IIntegrationAction> actions,
+            IEventTypeRegistry eventTypes, IServerInfo identity = null)
         {
             Store = store;
             _events = events;
+            EventTypes = eventTypes;
             _identity = identity;
             Actions = actions.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase).ToList();
             _actions = Actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
         }
 
         public IntegrationStore Store { get; }
+
+        /// <summary>The event types integrations can be triggered by.</summary>
+        public IEventTypeRegistry EventTypes { get; }
 
         /// <summary>Registered action types, by label.</summary>
         public IReadOnlyList<IIntegrationAction> Actions { get; }
@@ -104,7 +107,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             {
                 errors[IntegrationValidation.Triggers] = "Add the event that runs this integration.";
             }
-            else if (draft.TriggerTypes.FirstOrDefault(t => SrsEventTypes.Find(t) == null) is { } unknown)
+            else if (draft.TriggerTypes.FirstOrDefault(t => EventTypes.Find(t) == null) is { } unknown)
             {
                 errors[IntegrationValidation.Triggers] = $"\"{unknown}\" is not an event type.";
             }
@@ -201,7 +204,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 return "The integration no longer exists.";
             }
 
-            Publish(created ? SrsEventTypes.IntegrationCreated : SrsEventTypes.IntegrationUpdated, actor,
+            Publish(created ? IntegrationEventTypes.IntegrationCreated : IntegrationEventTypes.IntegrationUpdated, actor,
                 $"{(created ? "Created" : "Changed")} integration \"{saved.Name}\"", saved);
             return null;
         }
@@ -214,7 +217,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
 
             var integration = Store.Get(id);
-            Publish(SrsEventTypes.IntegrationUpdated, actor,
+            Publish(IntegrationEventTypes.IntegrationUpdated, actor,
                 $"{(enabled ? "Enabled" : "Disabled")} integration \"{integration.Name}\"", integration);
             return true;
         }
@@ -227,7 +230,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 return false;
             }
 
-            Publish(SrsEventTypes.IntegrationDeleted, actor, $"Deleted integration \"{integration.Name}\"", integration);
+            Publish(IntegrationEventTypes.IntegrationDeleted, actor, $"Deleted integration \"{integration.Name}\"", integration);
             return true;
         }
 
@@ -248,10 +251,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             var action = FindAction(draft.ActionType);
             var config = WithStoredSecrets(draft);
             var runs = new List<IntegrationTestRun>();
-            foreach (var trigger in draft.Triggers.Distinct())
+            foreach (var trigger in draft.Triggers(EventTypes).Distinct())
             {
                 // Example event data, but this server's real name, version and address.
-                var data = EventData.Sample(trigger, _identity?.Section());
+                var data = EventData.Sample(trigger, EventData.ServerSection(_identity));
                 var context = new IntegrationExecutionContext
                 {
                     Integration = draft,
@@ -320,7 +323,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         private void Publish(SrsEventType type, string actor, string message, IntegrationDefinition integration)
         {
-            _events.Publish(type, actor, message, new JsonObject
+            _events.Publish(SrsEvent.Create(type, actor, message, new JsonObject
             {
                 ["integration"] = new JsonObject
                 {
@@ -330,7 +333,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     ["action"] = integration.ActionType,
                     ["enabled"] = integration.Enabled
                 }
-            });
+            }));
         }
     }
 }

@@ -1,6 +1,6 @@
 @page "/integrations"
 @attribute [Authorize]
-@inherits LiveComponent
+@inherits LiveComponentBase
 @inject IntegrationService Service
 
 <PageTitle>Integrations · IL2-SRS Server</PageTitle>
@@ -71,7 +71,7 @@ else
                         <td>
                             @foreach (var trigger in integration.TriggerTypes)
                             {
-                                <div>@(SrsEventTypes.Find(trigger)?.Label ?? trigger)</div>
+                                <div>@(Service.EventTypes.Find(trigger)?.Label ?? trigger)</div>
                             }
                             @if (integration.Conditions.Count > 0)
                             {

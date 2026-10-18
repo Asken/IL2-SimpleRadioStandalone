@@ -4,38 +4,7 @@ using System.Linq;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
 {
-    /// <summary>
-    /// A field in an event payload, addressed by a dotted path such as <c>client.name</c>. The example value
-    /// is used for test runs and template previews.
-    /// </summary>
-    public sealed record SrsEventField(string Path, string Type, string Description, object Example = null);
-
-    /// <summary>
-    /// One kind of event the server publishes: its type name (e.g. <c>client.connected</c>), the event log
-    /// category it is stored under, and the payload fields integrations can filter on and use in templates.
-    /// </summary>
-    public sealed class SrsEventType
-    {
-        public SrsEventType(string type, string category, string label, string description,
-            params IEnumerable<SrsEventField>[] fields)
-        {
-            Type = type;
-            Category = category;
-            Label = label;
-            Description = description;
-            Fields = fields.SelectMany(group => group).ToArray();
-        }
-
-        public string Type { get; }
-        public string Category { get; }
-        public string Label { get; }
-        public string Description { get; }
-        public IReadOnlyList<SrsEventField> Fields { get; }
-
-        public override string ToString() => Type;
-    }
-
-    /// <summary>Every event type the server publishes.</summary>
+    /// <summary>Every event type the server itself publishes; plugins add theirs (see <see cref="IEventTypeRegistry"/>).</summary>
     public static class SrsEventTypes
     {
         private static readonly SrsEventField[] ClientFields =
@@ -80,31 +49,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
         private static readonly SrsEventField[] RemoteFields =
         {
             new("ip", "string", "Remote IP address", "203.0.113.7")
-        };
-
-        private static readonly SrsEventField[] IntegrationFields =
-        {
-            new("integration.id", "number", "Integration id", 3),
-            new("integration.name", "string", "Integration name", "Post joins to Discord"),
-            new("integration.triggers", "string", "Trigger event types, comma-separated",
-                "server.started,server.stopped"),
-            new("integration.action", "string", "Action type", "discord-webhook")
-        };
-
-        /// <summary>Fields every event has in addition to its payload, for conditions and templates.</summary>
-        public static readonly IReadOnlyList<SrsEventField> CommonFields = new SrsEventField[]
-        {
-            new("event.type", "string", "Event type, e.g. client.connected"),
-            new("event.label", "string", "Event name, e.g. Client connected"),
-            new("event.category", "string", "server, client, radio, admin or auth"),
-            new("event.actor", "string", "Who caused it: system, admin, api:<key name> or anonymous", "system"),
-            new("event.message", "string", "The event log message"),
-            new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z"),
-            new("server.name", "string", "Server Name setting, or the host name when it isn't set", "My SRS Server"),
-            new("server.hostname", "string",
-                "Host name; in Docker the container ID unless the stack sets hostname", "srs-1"),
-            new("server.version", "string", "Server version, e.g. the image version", "1.0.5.0-preview"),
-            new("server.adminUrl", "string", "Public Admin URL setting, when set", "https://srs.example.com")
         };
 
         public static readonly SrsEventType ServerStarted = new("server.started", EventCategory.Server,
@@ -208,16 +152,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             "Event log cleared", "An admin deleted all stored events.",
             new SrsEventField[] { new("deleted", "number", "Events deleted", 1520) });
 
-        public static readonly SrsEventType IntegrationCreated = new("admin.integration_created", EventCategory.Admin,
-            "Integration created", "An admin created an integration.", IntegrationFields);
-
-        public static readonly SrsEventType IntegrationUpdated = new("admin.integration_updated", EventCategory.Admin,
-            "Integration changed", "An admin changed, enabled or disabled an integration.", IntegrationFields,
-            new SrsEventField[] { new("integration.enabled", "boolean", "Whether the integration is enabled", true) });
-
-        public static readonly SrsEventType IntegrationDeleted = new("admin.integration_deleted", EventCategory.Admin,
-            "Integration deleted", "An admin deleted an integration.", IntegrationFields);
-
         public static readonly SrsEventType AdminLogin = new("auth.login", EventCategory.Auth,
             "Admin login", "Someone logged in to the admin UI.", RemoteFields);
 
@@ -234,7 +168,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
             RadioFrequencyChanged,
             ClientKicked, ClientBanned, AddressBanned, BanRemoved, ClientMuted, ClientUnmuted, SettingChanged,
             ChannelNamesChanged, ApiKeyCreated, ApiKeyRevoked, EventLogCleared,
-            IntegrationCreated, IntegrationUpdated, IntegrationDeleted,
             AdminLogin, AdminLoginFailed, AdminLogout
         };
 
@@ -245,6 +178,34 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
         public static SrsEventType Find(string type)
         {
             return type != null && ByType.TryGetValue(type, out var eventType) ? eventType : null;
+        }
+    }
+
+    /// <summary>The built-in event types and those plugins registered.</summary>
+    public sealed class EventTypeRegistry : IEventTypeRegistry
+    {
+        private readonly Dictionary<string, SrsEventType> _byType;
+
+        public EventTypeRegistry(IEnumerable<EventTypeRegistration> registrations)
+        {
+            var all = new List<SrsEventType>(SrsEventTypes.All);
+            _byType = all.ToDictionary(type => type.Type, StringComparer.Ordinal);
+            foreach (var type in registrations.SelectMany(registration => registration.Types))
+            {
+                if (_byType.TryAdd(type.Type, type))
+                {
+                    all.Add(type);
+                }
+            }
+
+            All = all;
+        }
+
+        public IReadOnlyList<SrsEventType> All { get; }
+
+        public SrsEventType Find(string type)
+        {
+            return type != null && _byType.TryGetValue(type, out var eventType) ? eventType : null;
         }
     }
 }

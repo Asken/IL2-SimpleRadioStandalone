@@ -75,8 +75,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         public DateTime UpdatedAtUtc { get; init; }
 
         /// <summary>The trigger events this server knows, in the order they were added.</summary>
-        public IReadOnlyList<SrsEventType> Triggers =>
-            TriggerTypes.Select(SrsEventTypes.Find).Where(t => t != null).ToList();
+        public IReadOnlyList<SrsEventType> Triggers(IEventTypeRegistry eventTypes) =>
+            TriggerTypes.Select(eventTypes.Find).Where(t => t != null).ToList();
 
         public bool IsTriggeredBy(string eventType) => TriggerTypes.Contains(eventType, StringComparer.Ordinal);
 

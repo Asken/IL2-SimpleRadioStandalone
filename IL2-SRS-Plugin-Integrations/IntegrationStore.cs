@@ -26,11 +26,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             "id, integration_id, integration_name, action_type, event_type, event_message, data, status, attempts, " +
             "created_at, next_attempt_at, finished_at, last_error, result";
 
-        private readonly SrsDatabase _database;
+        private readonly IntegrationDatabase _database;
         private readonly SecretProtector _secrets;
         private readonly Dictionary<string, IIntegrationAction> _actions;
 
-        public IntegrationStore(SrsDatabase database, SecretProtector secrets, IEnumerable<IIntegrationAction> actions)
+        public IntegrationStore(IntegrationDatabase database, SecretProtector secrets, IEnumerable<IIntegrationAction> actions)
         {
             _database = database;
             _secrets = secrets;
@@ -101,7 +101,7 @@ SELECT $id;";
                 command.Parameters.AddWithValue("$retryMode", integration.RetryMode.ToString().ToLowerInvariant());
                 command.Parameters.AddWithValue("$maxRetries",
                     integration.RetryMode == RetryMode.None ? 0 : integration.MaxRetries);
-                command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(now));
+                command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(now));
                 id = (long)command.ExecuteScalar();
             }
 
@@ -118,7 +118,7 @@ SELECT $id;";
                 command.CommandText = "UPDATE integrations SET enabled = $enabled, updated_at = $now WHERE id = $id;";
                 command.Parameters.AddWithValue("$id", id);
                 command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
-                command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+                command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
                 updated = command.ExecuteNonQuery();
             }
 
@@ -145,7 +145,7 @@ WHERE integration_id = $id AND status = 'queued';
 DELETE FROM integration_state WHERE integration_id = $id;
 DELETE FROM integrations WHERE id = $id;";
                 command.Parameters.AddWithValue("$id", id);
-                command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+                command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
                 command.ExecuteNonQuery();
                 using var changes = connection.CreateCommand();
                 changes.Transaction = transaction;
@@ -182,7 +182,7 @@ SELECT last_insert_rowid();";
                 command.Parameters.AddWithValue("$eventType", eventType);
                 command.Parameters.AddWithValue("$message", (object)eventMessage ?? DBNull.Value);
                 command.Parameters.AddWithValue("$data", data.GetRawText());
-                command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+                command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
                 id = (long)command.ExecuteScalar();
             }
 
@@ -198,7 +198,7 @@ SELECT last_insert_rowid();";
             command.CommandText = $@"SELECT {ExecutionColumns} FROM integration_executions
 WHERE status = 'queued' AND next_attempt_at <= $now AND {IsOldestPending}
 ORDER BY id LIMIT $limit;";
-            command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(utcNow));
+            command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(utcNow));
             command.Parameters.AddWithValue("$limit", limit);
             return ReadExecutions(command);
         }
@@ -217,7 +217,7 @@ ORDER BY id LIMIT $limit;";
             using var command = connection.CreateCommand();
             command.CommandText =
                 $"SELECT MIN(next_attempt_at) FROM integration_executions WHERE status = 'queued' AND {IsOldestPending};";
-            return SrsDatabase.ParseNullableTimestamp(command.ExecuteScalar());
+            return SqliteDatabase.ParseNullableTimestamp(command.ExecuteScalar());
         }
 
         /// <summary>Marks a queued run as running and counts the attempt; false if another worker took it.</summary>
@@ -255,9 +255,9 @@ WHERE id = $id;";
                 command.Parameters.AddWithValue("$error", (object)Truncate(error) ?? DBNull.Value);
                 command.Parameters.AddWithValue("$result", (object)Truncate(result) ?? DBNull.Value);
                 command.Parameters.AddWithValue("$next",
-                    nextAttemptAtUtc.HasValue ? SrsDatabase.FormatTimestamp(nextAttemptAtUtc.Value) : DBNull.Value);
+                    nextAttemptAtUtc.HasValue ? SqliteDatabase.FormatTimestamp(nextAttemptAtUtc.Value) : DBNull.Value);
                 command.Parameters.AddWithValue("$finished", ExecutionStatus.IsFinished(status)
-                    ? SrsDatabase.FormatTimestamp(DateTime.UtcNow)
+                    ? SqliteDatabase.FormatTimestamp(DateTime.UtcNow)
                     : DBNull.Value);
                 command.ExecuteNonQuery();
             }
@@ -276,7 +276,7 @@ WHERE id = $id;";
 WHERE id = $id;";
                 command.Parameters.AddWithValue("$id", executionId);
                 command.Parameters.AddWithValue("$reason", (object)Truncate(reason) ?? DBNull.Value);
-                command.Parameters.AddWithValue("$next", SrsDatabase.FormatTimestamp(nextAttemptAtUtc));
+                command.Parameters.AddWithValue("$next", SqliteDatabase.FormatTimestamp(nextAttemptAtUtc));
                 command.ExecuteNonQuery();
             }
 
@@ -294,7 +294,7 @@ WHERE id = $id;";
     finished_at = NULL
 WHERE id = $id AND status IN ('failed', 'skipped', 'succeeded');";
                 command.Parameters.AddWithValue("$id", executionId);
-                command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+                command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
                 updated = command.ExecuteNonQuery();
             }
 
@@ -313,7 +313,7 @@ WHERE id = $id AND status IN ('failed', 'skipped', 'succeeded');";
             using var command = connection.CreateCommand();
             command.CommandText = @"UPDATE integration_executions SET status = 'queued', next_attempt_at = $now
 WHERE status = 'running';";
-            command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+            command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
             return command.ExecuteNonQuery();
         }
 
@@ -370,7 +370,7 @@ WHERE id IN (SELECT MAX(id) FROM integration_executions GROUP BY integration_id)
 DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skipped') AND created_at < $cutoff;
 DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skipped')
     AND id <= (SELECT id FROM integration_executions ORDER BY id DESC LIMIT 1 OFFSET $maxRows);";
-            command.Parameters.AddWithValue("$cutoff", SrsDatabase.FormatTimestamp(utcNow.AddDays(-days)));
+            command.Parameters.AddWithValue("$cutoff", SqliteDatabase.FormatTimestamp(utcNow.AddDays(-days)));
             command.Parameters.AddWithValue("$maxRows", maxRows);
             return command.ExecuteNonQuery();
         }
@@ -463,8 +463,8 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                     SecretHints = hints,
                     RetryMode = Enum.TryParse<RetryMode>(reader.GetString(8), true, out var mode) ? mode : RetryMode.None,
                     MaxRetries = (int)reader.GetInt64(9),
-                    CreatedAtUtc = SrsDatabase.ParseTimestamp(reader.GetString(10)),
-                    UpdatedAtUtc = SrsDatabase.ParseTimestamp(reader.GetString(11))
+                    CreatedAtUtc = SqliteDatabase.ParseTimestamp(reader.GetString(10)),
+                    UpdatedAtUtc = SqliteDatabase.ParseTimestamp(reader.GetString(11))
                 });
             }
 
@@ -488,9 +488,9 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                     Data = reader.GetString(6),
                     Status = reader.GetString(7),
                     Attempts = (int)reader.GetInt64(8),
-                    CreatedAtUtc = SrsDatabase.ParseTimestamp(reader.GetString(9)),
-                    NextAttemptAtUtc = SrsDatabase.ParseNullableTimestamp(reader.GetValue(10)),
-                    FinishedAtUtc = SrsDatabase.ParseNullableTimestamp(reader.GetValue(11)),
+                    CreatedAtUtc = SqliteDatabase.ParseTimestamp(reader.GetString(9)),
+                    NextAttemptAtUtc = SqliteDatabase.ParseNullableTimestamp(reader.GetValue(10)),
+                    FinishedAtUtc = SqliteDatabase.ParseNullableTimestamp(reader.GetValue(11)),
                     LastError = reader.IsDBNull(12) ? null : reader.GetString(12),
                     Result = reader.IsDBNull(13) ? null : reader.GetString(13)
                 });
@@ -548,7 +548,7 @@ ON CONFLICT (integration_id, key) DO UPDATE SET value = excluded.value, updated_
             command.Parameters.AddWithValue("$id", integrationId);
             command.Parameters.AddWithValue("$key", key);
             command.Parameters.AddWithValue("$value", (object)value ?? DBNull.Value);
-            command.Parameters.AddWithValue("$now", SrsDatabase.FormatTimestamp(DateTime.UtcNow));
+            command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
             command.ExecuteNonQuery();
         }
 
