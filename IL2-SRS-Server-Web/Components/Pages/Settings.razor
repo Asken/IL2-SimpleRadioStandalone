@@ -49,6 +49,7 @@
                             }
                         </label>
                         <span class="setting-help">@definition.Description</span>
+                        <FieldError Id="@(definition.Name + "-error")" Message="@DraftError(definition)" />
                     </div>
                     <div class="setting-control">
                         @if (definition.Kind == SettingKind.Toggle)
@@ -63,13 +64,18 @@
                         else
                         {
                             var draft = Draft(definition, value);
+                            var error = DraftError(definition);
                             <input id="@definition.Name"
                                    type="@(definition.Kind == SettingKind.Number ? "number" : "text")"
                                    min="@(definition.Kind == SettingKind.Number ? definition.Minimum.ToString(CultureInfo.InvariantCulture) : null)"
                                    max="@(definition.Kind == SettingKind.Number ? definition.Maximum.ToString(CultureInfo.InvariantCulture) : null)"
                                    class="@(definition.Kind == SettingKind.Number ? "input-narrow" : "")"
                                    value="@draft" disabled="@value.IsLocked"
-                                   @oninput="e => _drafts[definition.Key] = e.Value?.ToString()" />
+                                   aria-invalid="@FieldError.Invalid(error)"
+                                   aria-describedby="@FieldError.DescribedBy(definition.Name + "-error", error)"
+                                   @ref="_inputs[definition.Key]"
+                                   @oninput="e => _drafts[definition.Key] = e.Value?.ToString()"
+                                   @onblur="() => _form.Touch(definition.Name)" />
                             <button type="button" class="btn btn-quiet"
                                     disabled="@(value.IsLocked || draft == value.StringValue)"
                                     @onclick="() => Save(definition)">Save</button>
@@ -86,6 +92,8 @@
         { SettingDefinition.RadioGroup, SettingDefinition.ClientGroup, SettingDefinition.ServerGroup };
 
     private readonly Dictionary<ServerSettingsKeys, string> _drafts = new Dictionary<ServerSettingsKeys, string>();
+    private readonly Dictionary<ServerSettingsKeys, ElementReference> _inputs = new();
+    private readonly FormState _form = new();
     private string _error;
     private string _message;
     private bool _restartNeeded;
@@ -95,15 +103,29 @@
     private string Draft(SettingDefinition definition, SettingValue value) =>
         _drafts.TryGetValue(definition.Key, out var draft) ? draft : value.StringValue;
 
+    /// <summary>The error for an edited value that hasn't been saved, once the field was left or Save pressed.</summary>
+    private string DraftError(SettingDefinition definition) =>
+        _drafts.TryGetValue(definition.Key, out var draft)
+            ? _form.Show(definition.Name, definition.Validate(draft))
+            : null;
+
     private void Toggle(SettingDefinition definition, bool enabled)
     {
         Report(definition, Admin.SetEnabled(definition, enabled, Actor));
     }
 
-    private void Save(SettingDefinition definition)
+    private async Task Save(SettingDefinition definition)
     {
         if (_drafts.TryGetValue(definition.Key, out var draft))
         {
+            _form.Touch(definition.Name);
+            if (definition.Validate(draft) != null)
+            {
+                _message = null;
+                await _inputs[definition.Key].FocusAsync();
+                return;
+            }
+
             var error = Admin.SetSetting(definition.Key, draft, Actor);
             if (error == null)
             {

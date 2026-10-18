@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
@@ -12,9 +14,76 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
     {
         public const string FileName = "srs.db";
 
-        // 2: coalition_channel_names. Every statement below is CREATE ... IF NOT EXISTS, so an older
-        // database is upgraded by running the whole script again.
-        private const int SchemaVersion = 2;
+        /// <summary>
+        /// Schema changes, in order; migration N takes the database from version N to N + 1. Every migration must be
+        /// safe to run again (CREATE ... IF NOT EXISTS; ADD COLUMN is skipped when the column exists): whenever the
+        /// database's version differs from <see cref="SchemaVersion"/>, all of them run, so databases numbered by an
+        /// older build, a newer one or a fork with its own migrations still end up with every table and column. A
+        /// database numbered higher is set back to this build's version, so a build with more migrations runs them
+        /// all again rather than skipping its own.
+        /// </summary>
+        private static readonly string[] Migrations =
+        {
+            // 1: initial schema.
+            @"
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS channel_names (
+    channel INTEGER PRIMARY KEY,
+    name    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS bans (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip          TEXT NOT NULL,
+    player_name TEXT,
+    reason      TEXT,
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_bans_ip ON bans (ip);
+CREATE TABLE IF NOT EXISTS events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    message     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_events_occurred_at ON events (occurred_at);
+CREATE TABLE IF NOT EXISTS api_keys (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    scope        TEXT NOT NULL,
+    prefix       TEXT NOT NULL UNIQUE,
+    key_hash     BLOB NOT NULL UNIQUE,
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT,
+    revoked_at   TEXT
+);",
+            // 2: per-coalition channel names (upstream 1.0.5.0).
+            @"
+CREATE TABLE IF NOT EXISTS coalition_channel_names (
+    coalition INTEGER NOT NULL,
+    channel   INTEGER NOT NULL,
+    name      TEXT NOT NULL,
+    PRIMARY KEY (coalition, channel)
+);",
+            // 3: typed events (type, client and JSON payload; null for older rows).
+            @"
+ALTER TABLE events ADD COLUMN type TEXT;
+ALTER TABLE events ADD COLUMN client_guid TEXT;
+ALTER TABLE events ADD COLUMN payload TEXT;
+CREATE INDEX IF NOT EXISTS ix_events_type ON events (type);
+CREATE INDEX IF NOT EXISTS ix_events_client_guid ON events (client_guid);"
+        };
+
+        public static int SchemaVersion => Migrations.Length;
+
+        private static readonly Regex AddColumn = new(@"^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private readonly string _connectionString;
 
@@ -72,65 +141,60 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
             }
 
             var version = ExecuteScalarInt(connection, "PRAGMA user_version;");
-            if (version >= SchemaVersion)
+            if (version == SchemaVersion)
             {
                 return;
             }
 
             using var transaction = connection.BeginTransaction();
+            foreach (var migration in Migrations)
+            {
+                foreach (var statement in migration.Split(';'))
+                {
+                    if (string.IsNullOrWhiteSpace(statement) || HasColumnAlready(connection, transaction, statement))
+                    {
+                        continue;
+                    }
+
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = statement + ";";
+                    command.ExecuteNonQuery();
+                }
+            }
+
             using (var command = connection.CreateCommand())
             {
                 command.Transaction = transaction;
-                command.CommandText = @"
-CREATE TABLE IF NOT EXISTS settings (
-    key        TEXT PRIMARY KEY,
-    value      TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS channel_names (
-    channel INTEGER PRIMARY KEY,
-    name    TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS coalition_channel_names (
-    coalition INTEGER NOT NULL,
-    channel   INTEGER NOT NULL,
-    name      TEXT NOT NULL,
-    PRIMARY KEY (coalition, channel)
-);
-CREATE TABLE IF NOT EXISTS bans (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ip          TEXT NOT NULL,
-    player_name TEXT,
-    reason      TEXT,
-    created_by  TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    expires_at  TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_bans_ip ON bans (ip);
-CREATE TABLE IF NOT EXISTS events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    occurred_at TEXT NOT NULL,
-    category    TEXT NOT NULL,
-    actor       TEXT NOT NULL,
-    message     TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_events_occurred_at ON events (occurred_at);
-CREATE TABLE IF NOT EXISTS api_keys (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    name         TEXT NOT NULL,
-    scope        TEXT NOT NULL,
-    prefix       TEXT NOT NULL UNIQUE,
-    key_hash     BLOB NOT NULL UNIQUE,
-    created_at   TEXT NOT NULL,
-    last_used_at TEXT,
-    revoked_at   TEXT
-);
-PRAGMA user_version = " + SchemaVersion.ToString(CultureInfo.InvariantCulture) + ";";
+                command.CommandText = "PRAGMA user_version = " + SchemaVersion.ToString(CultureInfo.InvariantCulture) + ";";
                 command.ExecuteNonQuery();
             }
 
             transaction.Commit();
             WasCreated = version == 0;
+        }
+
+        /// <summary>True for an ALTER TABLE ... ADD COLUMN whose column is already there.</summary>
+        private static bool HasColumnAlready(SqliteConnection connection, SqliteTransaction transaction, string statement)
+        {
+            var match = AddColumn.Match(statement);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT name FROM pragma_table_info($table);";
+            command.Parameters.AddWithValue("$table", match.Groups[1].Value);
+            using var reader = command.ExecuteReader();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(0));
+            }
+
+            return columns.Contains(match.Groups[2].Value);
         }
 
         private static int ExecuteScalarInt(SqliteConnection connection, string sql)

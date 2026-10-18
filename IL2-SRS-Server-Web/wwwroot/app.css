@@ -8,6 +8,8 @@
     --accent: #2563c9;
     --accent-text: #ffffff;
     --danger: #c42b2b;
+    /* Error text (field errors, error alerts); a theme whose --danger is too dark for text overrides it. */
+    --error-text: var(--danger);
     --ok: #1d8a4a;
     --warn: #b7791f;
     --red: #d64545;
@@ -87,6 +89,7 @@
     --steel-face: linear-gradient(#a5acb1, #888f94);
     --steel-hover: linear-gradient(#b0b6ba, #949ba0);
     --danger-text: #fbd0c8;
+    --error-text: #e08a7e;
     --warn-text: #f4d895;
     --lamp-ring: #3d4043;
     --screw-stops: #c0bcad 0, #8f8d84 1.2px, #5f6266 3.2px, #2c2f31 4.6px, var(--rim) 5px, transparent 5.6px;
@@ -251,7 +254,7 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
     margin: .5rem 0 1rem;
 }
 
-.alert-error { border-color: var(--danger); color: var(--danger); }
+.alert-error { border-color: var(--danger); color: var(--error-text); }
 
 .badge {
     display: inline-block;
@@ -318,6 +321,17 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 .tag-admin { color: var(--accent); border-color: var(--accent); }
 .tag-auth { color: var(--warn); border-color: var(--warn); }
 .tag-server { color: var(--ok); border-color: var(--ok); }
+.tag-radio { color: var(--text); border-color: var(--muted); }
+
+.events tr.expandable { cursor: pointer; }
+.events tr.expandable:hover td { background: var(--surface-2); }
+.events .payload-row td { background: var(--surface-2); }
+.payload { margin: 0; font-family: var(--mono); font-size: .8rem; white-space: pre-wrap; word-break: break-word; }
+.btn-small { padding: .1rem .3rem; margin-left: .35rem; vertical-align: middle; }
+.btn-small .icon { width: 14px; height: 14px; }
+.filter-chip { align-self: flex-end; }
+
+.live-toggle { display: inline-flex; align-items: center; gap: .35rem; font-size: .9rem; color: var(--muted); }
 
 .event-list { list-style: none; margin: 0; padding: 0; }
 .event-list li { display: flex; gap: .6rem; align-items: baseline; padding: .3rem 0; border-bottom: 1px solid var(--border); }
@@ -327,6 +341,15 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 .filters, .inline-form { display: flex; gap: .75rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
 .filters label, .inline-form label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
 .inline-form .grow { flex: 1 1 220px; }
+
+/* Fields with an error under them. Inline forms align to the top so a field's error doesn't move its
+   neighbours; .form-button gives the button an empty label line so it lines up with the inputs. */
+.inline-form { align-items: flex-start; }
+.inline-form .form-field, .form-button { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; color: var(--muted); }
+.login-card .form-field { display: flex; flex-direction: column; gap: .3rem; font-size: .88rem; color: var(--muted); }
+.field-error { color: var(--error-text); font-size: .8rem; }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--danger); }
+input[aria-invalid="true"]:focus-visible, select[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-visible { outline-color: var(--danger); }
 .ban-form { display: inline-flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
 .ban-form input { width: 12rem; }
 
@@ -556,7 +579,10 @@ input[type=text], input[type=search], input[type=password], input[type=number], 
 }
 
 :root[data-theme="srs"] .alert { background: var(--well); border-color: var(--rim); box-shadow: inset 0 2px 3px rgb(0 0 0 / .4); }
-:root[data-theme="srs"] .alert-error { border-color: var(--danger); color: #e08a7e; }
+:root[data-theme="srs"] input[aria-invalid="true"],
+:root[data-theme="srs"] select[aria-invalid="true"],
+:root[data-theme="srs"] textarea[aria-invalid="true"] { border-color: var(--danger); }
+:root[data-theme="srs"] .alert-error { border-color: var(--danger); }
 
 :root[data-theme="srs"] .table-wrap { background: var(--well); border-color: var(--rim); box-shadow: 0 1px 0 var(--highlight); }
 :root[data-theme="srs"] .grid th { background: var(--chrome); font-family: var(--mono); font-weight: 400; }

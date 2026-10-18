@@ -4,7 +4,9 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
+using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Xunit;
 
@@ -94,33 +96,63 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
     public class AuditLogTests
     {
         [Fact]
-        public async Task StoresQueuedEventsAndFiltersThem()
+        public async Task StoresPublishedEventsAndFiltersThem()
         {
             using var temp = new TempDirectory();
-            var audit = new AuditLog(temp.CreateDatabase(), new AuditRetention());
+            var events = new ServerEvents();
+            var audit = new AuditLog(temp.CreateDatabase(), new AuditRetention(), events);
             await audit.StartAsync(CancellationToken.None);
 
-            audit.Write(AuditCategory.Admin, "admin", "Kicked Pilot One (Blue)");
-            audit.Write(AuditCategory.Client, "system", "Pilot Two (Red) connected from 203.0.113.7");
-            audit.Write(AuditCategory.Auth, "anonymous", "Failed admin login from 203.0.113.9");
+            var pilot = new SRClient { ClientGuid = "guid-1", Name = "Pilot One", Coalition = 2 };
+            events.Publish(SrsEventTypes.ClientKicked, "admin", "Kicked Pilot One (Blue)", EventPayload.Client(pilot));
+            events.Publish(SrsEventTypes.ClientConnected, "system", "Pilot Two (Red) connected from 203.0.113.7");
+            events.Publish(SrsEventTypes.AdminLoginFailed, "anonymous", "Failed admin login from 203.0.113.9",
+                EventPayload.Remote("203.0.113.9"));
             await audit.StopAsync(CancellationToken.None);
 
             Assert.Equal(3, audit.Count());
-            Assert.Equal("Failed admin login from 203.0.113.9", audit.Query().First().Message);
-            Assert.Single(audit.Query(category: AuditCategory.Client));
+            var newest = audit.Query().First();
+            Assert.Equal("Failed admin login from 203.0.113.9", newest.Message);
+            Assert.Equal("auth.login_failed", newest.Type);
+            Assert.Equal("{\"ip\":\"203.0.113.9\"}", newest.Payload);
+            Assert.Single(audit.Query(category: EventCategory.Client));
             Assert.Single(audit.Query(search: "pilot one"));
             Assert.Empty(audit.Query(search: "100%_"));
+
+            var kicked = Assert.Single(audit.Query(type: "admin.client_kicked"));
+            Assert.Equal(EventCategory.Admin, kicked.Category);
+            Assert.Equal("guid-1", kicked.ClientGuid);
+            Assert.Equal(kicked.Id, Assert.Single(audit.Query(clientGuid: "guid-1")).Id);
+        }
+
+        [Fact]
+        public async Task ClearingTheLogRecordsWhoClearedIt()
+        {
+            using var temp = new TempDirectory();
+            var events = new ServerEvents();
+            var audit = new AuditLog(temp.CreateDatabase(), new AuditRetention(), events);
+            await audit.StartAsync(CancellationToken.None);
+            events.Publish(SrsEventTypes.ServerStarted, "system", "Server started");
+            await audit.StopAsync(CancellationToken.None);
+
+            Assert.Equal(1, audit.Clear("admin"));
+            await audit.StopAsync(CancellationToken.None);
+
+            var cleared = Assert.Single(audit.Query());
+            Assert.Equal("admin.event_log_cleared", cleared.Type);
+            Assert.Equal("{\"deleted\":1}", cleared.Payload);
         }
 
         [Fact]
         public async Task RetentionKeepsOnlyRecentEventsWithinTheRowLimit()
         {
             using var temp = new TempDirectory();
-            var audit = new AuditLog(temp.CreateDatabase(), new AuditRetention { Days = 30, MaxRows = 3 });
+            var events = new ServerEvents();
+            var audit = new AuditLog(temp.CreateDatabase(), new AuditRetention { Days = 30, MaxRows = 3 }, events);
             await audit.StartAsync(CancellationToken.None);
             for (var i = 1; i <= 5; i++)
             {
-                audit.Write(AuditCategory.Server, "system", "event " + i);
+                events.Publish(SrsEventTypes.ServerStarted, "system", "event " + i);
             }
 
             await audit.StopAsync(CancellationToken.None);

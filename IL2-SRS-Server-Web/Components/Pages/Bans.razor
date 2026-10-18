@@ -12,11 +12,15 @@
 
 <section class="panel">
     <h2>Ban an IP address</h2>
-    <form class="inline-form" @onsubmit="Add">
-        <label>
-            <span>IP address</span>
-            <input type="text" required placeholder="203.0.113.7" @bind="_ip" />
-        </label>
+    <form class="inline-form" novalidate @onsubmit="Add">
+        <div class="form-field">
+            <label for="ban-ip">IP address</label>
+            <input id="ban-ip" type="text" placeholder="203.0.113.7" spellcheck="false"
+                   aria-invalid="@FieldError.Invalid(IpError)"
+                   aria-describedby="@FieldError.DescribedBy("ban-ip-error", IpError)"
+                   @ref="_ipInput" @bind="_ip" @bind:event="oninput" @onblur="() => _form.Touch(IpField)" />
+            <FieldError Id="ban-ip-error" Message="@IpError" />
+        </div>
         <label>
             <span>Player (optional)</span>
             <input type="text" maxlength="100" @bind="_player" />
@@ -35,7 +39,10 @@
                 <option value="43200">30 days</option>
             </select>
         </label>
-        <button type="submit" class="btn btn-danger">Ban</button>
+        <div class="form-button">
+            <span aria-hidden="true">&nbsp;</span>
+            <button type="submit" class="btn btn-danger">Ban</button>
+        </div>
     </form>
     @if (_error != null)
     {
@@ -109,13 +116,26 @@ else
     private int _minutes;
     private string _error;
     private string _message;
+    private readonly FormState _form = new();
+    private ElementReference _ipInput;
 
+    private const string IpField = "ip";
+    private string IpError => _form.Show(IpField, ServerAdminService.ValidateIpAddress(_ip));
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
     protected override void OnInitialized() => _bans = Admin.GetBans();
 
-    private void Add()
+    private async Task Add()
     {
+        _error = null;
+        _message = null;
+        _form.Submit();
+        if (IpError != null)
+        {
+            await _ipInput.FocusAsync();
+            return;
+        }
+
         _error = Admin.BanAddress(_ip, _player, _reason, _minutes > 0 ? TimeSpan.FromMinutes(_minutes) : null, Actor,
             out var ban);
         _message = _error == null ? $"Banned {ban.IpAddress}." : null;
@@ -123,6 +143,7 @@ else
         {
             _ip = _player = _reason = null;
             _minutes = 0;
+            _form.Reset();
         }
 
         _bans = Admin.GetBans();

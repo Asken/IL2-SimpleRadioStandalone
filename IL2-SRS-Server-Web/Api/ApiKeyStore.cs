@@ -46,14 +46,29 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
             _database = database;
         }
 
+        public const int MaxNameLength = 64;
+
+        /// <summary>Checks a key name; returns an error message or null.</summary>
+        public static string ValidateName(string name)
+        {
+            name = (name ?? string.Empty).Trim();
+            if (name.Length == 0)
+            {
+                return "Enter a name for the key.";
+            }
+
+            return name.Length > MaxNameLength ? $"The name can be at most {MaxNameLength} characters." : null;
+        }
+
         /// <summary>Creates a key and returns it in plain text; it cannot be retrieved later.</summary>
         public (ApiKeyRecord Record, string Key) Create(string name, string scope)
         {
-            name = (name ?? string.Empty).Trim();
-            if (name.Length == 0 || name.Length > 64)
+            if (ValidateName(name) is { } nameError)
             {
-                throw new ArgumentException("API key name must be 1 to 64 characters.", nameof(name));
+                throw new ArgumentException(nameError, nameof(name));
             }
+
+            name = name.Trim();
 
             if (!ApiScope.IsValid(scope))
             {
