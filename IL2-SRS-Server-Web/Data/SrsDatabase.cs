@@ -16,9 +16,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
 
         /// <summary>
         /// Schema changes, in order; migration N takes the database from version N to N + 1. Every migration must be
-        /// safe to run again (CREATE ... IF NOT EXISTS; ADD COLUMN is skipped when the column exists): when the
-        /// database is behind, all of them run, so databases numbered by an older build or by another branch
-        /// (upstream's version 2 is the coalition channel names) still end up with every table and column.
+        /// safe to run again (CREATE ... IF NOT EXISTS; ADD COLUMN is skipped when the column exists): whenever the
+        /// database's version differs from <see cref="SchemaVersion"/>, all of them run, so databases numbered by an
+        /// older build, a newer one or another branch (upstream's version 2 is the coalition channel names) still
+        /// end up with every table and column. A database numbered higher is set back to this build's version, so a
+        /// build with more migrations runs them all again rather than skipping its own.
         /// </summary>
         private static readonly string[] Migrations =
         {
@@ -182,7 +184,7 @@ CREATE TABLE IF NOT EXISTS integration_state (
             }
 
             var version = ExecuteScalarInt(connection, "PRAGMA user_version;");
-            if (version >= SchemaVersion)
+            if (version == SchemaVersion)
             {
                 return;
             }
