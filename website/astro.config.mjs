@@ -43,6 +43,7 @@ export default defineConfig({
 						{ label: 'Using both radios', slug: 'guides/two-radios' },
 						{ label: 'Controls and PTT', slug: 'guides/controls' },
 						{ label: 'Overlays', slug: 'guides/overlays' },
+						{ label: 'RCI Controller mode', slug: 'guides/rci-controller' },
 					],
 				},
 				{

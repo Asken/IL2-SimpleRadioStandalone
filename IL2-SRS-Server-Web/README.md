@@ -15,7 +15,12 @@ What it adds over the WPF server:
   equipment panels) and is remembered per browser.
 - SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
-- Event log of logins, admin actions, server start/stop and client connections, with automatic retention.
+- Live event log of logins, admin actions, server start/stop, client connections, name and coalition changes and
+  radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
+- Integrations: run an action when an event happens, optionally only when the event data matches conditions
+  (for example only Red pilots). Runs are queued, kept across restarts, retried if configured and listed under
+  **Integration Runs**. Built-in actions: **Post to Discord** (webhook, plain message or card) and **Send an HTTP
+  request** (any URL, e.g. Slack or Teams webhooks). See [Integrations](#integrations).
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
 - Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
@@ -29,10 +34,10 @@ instead. The first log line shows which folder is in use.
 
 | File | Purpose |
 | --- | --- |
-| `srs.db` | Settings, channel names, bans, event log, API keys (SQLite, WAL mode) |
+| `srs.db` | Settings, channel names, bans, event log, API keys, integrations (SQLite, WAL mode) |
 | `srs-server.json` | Optional configuration file with the same `SRS_*` keys as the environment |
 | `serverlog.txt` | Full server log (also written to the console) |
-| `keys/` | Keys that protect the admin login cookie |
+| `keys/` | Keys that protect the admin login cookie and encrypt integration secrets (back it up with `srs.db`) |
 | `clients-list.json` | Client export, when **Auto Export List** is on |
 
 On first start, an existing `server.cfg` and `banned.txt` from the WPF server in the data directory are
@@ -61,7 +66,8 @@ Server setting names are those of `server.cfg` (`SERVER_PORT`, `COALITION_AUDIO_
 `SPECTATORS_AUDIO_DISABLED`, `IRL_RADIO_TX`, `RADIO_COLLISION_EFFECTS`, `SECOND_RADIO_ENABLED`,
 `CHANNEL_LIMIT`, `GLOBAL_LOBBY_FREQUENCIES`, `PRIORITY_TRANSMITTER_NAMES`, `SHOW_TUNED_COUNT`,
 `SHOW_TRANSMITTER_NAME`, `SHOW_SQUAD_CHANNEL_LABELS`, `CLIENT_EXPORT_ENABLED`, `CLIENT_EXPORT_FILE_PATH`,
-`ASSIGNED_CALLSIGNS_JSON_FILE`). Relative file paths are inside the data directory.
+`ASSIGNED_CALLSIGNS_JSON_FILE`), plus `SERVER_NAME` and `PUBLIC_ADMIN_URL` for integration messages.
+Relative file paths are inside the data directory.
 
 ## Docker
 
@@ -173,12 +179,74 @@ other keys.
 | `GET`, `PUT /api/v1/channel-names` | read, write | Shared channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
 | `GET`, `PUT /api/v1/channel-names/{coalition}` | read, write | Allied or Axis names (`allies`, `axis`) that replace the shared name for that coalition; same body. `PUT` leaves the shared names and the other coalition unchanged |
 | `GET /api/v1/bans`, `POST /api/v1/bans`, `DELETE /api/v1/bans/{id}` | read, write | Bans; `POST` body `{ "ipAddress": "203.0.113.7", "reason": "...", "durationMinutes": null }` |
-| `GET /api/v1/events?category=&search=&since=&limit=` | read | Event log, newest first |
+| `GET /api/v1/events?category=&type=&client=&search=&since=&limit=` | read | Event log, newest first, with each event's type and payload |
+| `GET /api/v1/event-types` | read | Event types and their payload fields |
 | `DELETE /api/v1/events` | write | Clear the event log |
+| `GET /api/v1/integrations`, `GET /api/v1/integrations/{id}` | read | Integrations (secret settings are never returned) |
+| `POST /api/v1/integrations`, `PUT`, `DELETE /api/v1/integrations/{id}` | write | Create, replace or delete an integration; a 400 lists every problem in `errors`, keyed by field (`name`, `config.webhookUrl`, …) |
+| `POST /api/v1/integrations/test` | write | Run an integration's action once with example data, without saving it |
+| `GET /api/v1/integrations/action-types` | read | Actions an integration can run |
+| `GET /api/v1/integrations/runs?status=&integration=&limit=` | read | Integration runs, newest first |
+| `POST /api/v1/integrations/runs/{id}/retry` | write | Run a finished run again |
 | `POST /api/v1/server/start`, `/stop`, `/restart` | write | Server lifecycle |
 
 ```sh
 curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
+```
+
+## Integrations
+
+An integration runs an action when one of its trigger events happens: add one or more events (for example
+**Server started** and **Server stopped**), optional conditions on the event data, and the action. **Test** runs it
+once for each trigger event with example data. Webhook URLs and headers are stored encrypted with the keys in `keys/`
+and never shown again; leave them empty when editing to keep the stored value.
+
+Messages and request bodies are [Scriban](https://github.com/scriban/scriban/blob/master/doc/language.md) templates
+over the event data shown on the integration page, with a live preview:
+
+```
+{{ client.name }} joined {{ client.coalitionName }}{{ if client.coalition == 1 }} 🔴{{ end }}
+```
+
+Every event also has `server.name` (the **Server Name** setting, or the host name), `server.hostname`,
+`server.version` and `server.adminUrl` (the **Public Admin URL** setting). In Docker the host name is the container
+ID unless the stack sets `hostname:`. Server events add `server.uptime` in seconds;
+`{{ timespan.from_seconds server.uptime }}` shows it as `03:12:40`.
+
+With several trigger events, `event.type` tells them apart:
+
+```
+{{ if event.type == "server.started" }}🟢 Server online{{ else }}🔴 Server offline{{ end }}
+```
+
+- **Post to Discord**: values from the event are Markdown-escaped, so a pilot called `**Admin**` shows as written,
+  and messages never mention anyone (`allowed_mentions` is empty). Use `{{ raw.client.name }}` for a value without
+  escaping. Each webhook sends at most 30 messages a minute; more wait their turn, as do messages Discord answers
+  with 429, without using up a retry.
+  **Each event: Updates one message** keeps editing the message the first event posted, e.g. a server status
+  pinned in the channel; if it is deleted or the webhook URL changes, the next event posts a new one. **Test**
+  always posts a separate message. The integration page shows the current message ID, and each run's result
+  names the message it posted or updated.
+- **Send an HTTP request**: POST, PUT or PATCH to any URL with optional headers. An empty body sends the event data
+  as JSON. With a JSON content type, text values are escaped for use inside quotes
+  (`{"text": "{{ event.message }}"}`) and the body must be valid JSON. Any 2xx response is a success; 5xx and
+  timeouts are temporary failures (retried if the integration retries), other responses fail the run.
+
+Templates run sandboxed: no includes, loops and recursion are limited and a template stops after 2 seconds.
+
+## Building on the server
+
+A host can add integration actions, admin pages, navigation links and Settings panels without changing this
+project: reference it and call `Program.Run` from its own `Main`.
+
+```csharp
+public static int Main(string[] args) => Program.Run(args, builder =>
+{
+    builder.Services.AddIntegrationAction<MyAction>();          // implements IIntegrationAction
+    builder.Services.AddAdminPages(typeof(MyPage).Assembly);   // routable components (@page)
+    builder.Services.AddAdminNavItem("my-page", "My Page");
+    builder.Services.AddAdminSettingsSection<MySettingsPanel>();
+});
 ```
 
 ## Development
@@ -188,6 +256,16 @@ Requires the .NET 10 SDK.
 ```sh
 dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWORD=dev-password
 dotnet test --project IL2-SRS-Server-Web.Tests
+```
+
+[`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload
+(`dotnet watch`): edits to `.razor`, `.cs` and `.css` files apply to the running server, which restarts itself
+when an edit can't be applied in place. It uses the same data volume and ports as the image (`il2-srs-data`,
+6002 and `127.0.0.1:8081`), so stop that container first, and reads `SRS_ADMIN_PASSWORD` from
+`IL2-SRS-Server-Web/.env` (git-ignored).
+
+```sh
+docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml up -d --build
 ```
 
 The network code under `Network/` is adapted from the WPF server (`IL2-SimpleRadio Server`), and

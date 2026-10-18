@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Microsoft.Extensions.Hosting;
 
@@ -13,19 +13,20 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting
     public sealed class SrsServerHostedService : IHostedService
     {
         private readonly ServerState _serverState;
-        private readonly AuditLog _audit;
+        private readonly ServerEvents _events;
 
-        public SrsServerHostedService(ServerState serverState, AuditLog audit, ServerEventAuditor auditor)
+        public SrsServerHostedService(ServerState serverState, ServerEvents events, ClientEventRecorder recorder)
         {
-            // The auditor is resolved here so client events are recorded from the first connection.
+            // The recorder is resolved here so client events are recorded from the first connection.
             _serverState = serverState;
-            _audit = audit;
+            _events = events;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _serverState.Start();
-            _audit.Write(AuditCategory.Server, "system", $"Server started on port {_serverState.Port}");
+            _events.Publish(SrsEventTypes.ServerStarted, "system", $"Server started on port {_serverState.Port}",
+                EventPayload.Server(_serverState.Port, 0, _serverState.StartedAtUtc));
             return Task.CompletedTask;
         }
 
@@ -33,8 +34,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting
         {
             if (_serverState.IsRunning)
             {
+                var payload = EventPayload.Server(_serverState.Port, _serverState.GetClients().Count,
+                    _serverState.StartedAtUtc);
                 _serverState.Stop();
-                _audit.Write(AuditCategory.Server, "system", "Server shut down");
+                _events.Publish(SrsEventTypes.ServerStopped, "system", "Server shut down", payload);
             }
 
             return Task.CompletedTask;

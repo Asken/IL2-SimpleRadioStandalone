@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -29,6 +30,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         private const string ClientGuid = "EndToEndClientGuid0001";
 
         private readonly TempDirectory _data = new TempDirectory();
+        private readonly RecordingAction _action = new RecordingAction();
         private WebApplication _app;
         private HttpClient _http;
         private int _srsPort;
@@ -44,7 +46,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 "--urls=http://127.0.0.1:0",
                 "--SRS_ADMIN_PASSWORD=correct-horse",
                 "--SRS_SERVER_PORT=" + _srsPort
-            }));
+            }), builder =>
+            {
+                // What a host building on the server does: add an action and an admin link.
+                builder.Services.AddSingleton(_action);
+                builder.Services.AddIntegrationAction<RecordingAction>();
+                builder.Services.AddAdminNavItem("workflows", "Workflows");
+            });
             await _app.StartAsync(TestContext.Current.CancellationToken);
 
             var address = _app.Services.GetRequiredService<IServer>().Features
@@ -62,6 +70,38 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             }
 
             _data.Dispose();
+        }
+
+        [Fact]
+        public async Task LoginShowsPasswordErrorsOnTheField()
+        {
+            var token = TestContext.Current.CancellationToken;
+            var login = await _http.GetStringAsync("/login", token);
+            Assert.DoesNotContain("aria-invalid", login);
+            var antiforgery = System.Text.RegularExpressions.Regex
+                .Match(login, "name=\"__RequestVerificationToken\" value=\"([^\"]+)\"").Groups[1].Value;
+            Assert.NotEmpty(antiforgery);
+
+            async Task<string> LogIn(string password)
+            {
+                using var form = new FormUrlEncodedContent(new[]
+                {
+                    new System.Collections.Generic.KeyValuePair<string, string>("__RequestVerificationToken", antiforgery),
+                    new System.Collections.Generic.KeyValuePair<string, string>("returnUrl", "/"),
+                    new System.Collections.Generic.KeyValuePair<string, string>("password", password)
+                });
+                using var response = await _http.PostAsync("/account/login", form, token);
+                Assert.Contains("/login", response.RequestMessage!.RequestUri!.AbsolutePath);
+                return await response.Content.ReadAsStringAsync(token);
+            }
+
+            var empty = await LogIn("");
+            Assert.Contains("Enter the admin password.", empty);
+            Assert.Contains("aria-invalid=\"true\"", empty);
+
+            var wrong = await LogIn("wrong-password");
+            Assert.Contains("Incorrect password.", wrong);
+            Assert.Contains("aria-describedby=\"password-error\"", wrong);
         }
 
         [Fact]
@@ -164,9 +204,100 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var events = Authorized(HttpMethod.Get, "/api/v1/events?category=admin", writeKey);
             using var eventResponse = await _http.SendAsync(events, token);
             var eventList = await eventResponse.Content.ReadFromJsonAsync<JsonElement>(token);
-            Assert.Contains(eventList.EnumerateArray(), e =>
+            var banned = Assert.Single(eventList.EnumerateArray(), e =>
                 e.GetProperty("actor").GetString() == "api:writer" &&
                 e.GetProperty("message").GetString().StartsWith("Banned Test Pilot (Red)", StringComparison.Ordinal));
+            Assert.Equal("admin.client_banned", banned.GetProperty("type").GetString());
+            var payload = banned.GetProperty("payload");
+            Assert.Equal("Test Pilot", payload.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("Red", payload.GetProperty("client").GetProperty("coalitionName").GetString());
+            Assert.Equal("127.0.0.1", payload.GetProperty("ban").GetProperty("ip").GetString());
+
+            using var connected = Authorized(HttpMethod.Get, "/api/v1/events?type=client.connected", writeKey);
+            using var connectedResponse = await _http.SendAsync(connected, token);
+            var connectedList = await connectedResponse.Content.ReadFromJsonAsync<JsonElement>(token);
+            Assert.Contains(connectedList.EnumerateArray(), e =>
+                e.GetProperty("payload").GetProperty("client").GetProperty("ip").GetString() == "127.0.0.1");
+
+            using var types = Authorized(HttpMethod.Get, "/api/v1/event-types", writeKey);
+            using var typesResponse = await _http.SendAsync(types, token);
+            var typeList = await typesResponse.Content.ReadFromJsonAsync<JsonElement>(token);
+            Assert.Contains(typeList.EnumerateArray(), t => t.GetProperty("type").GetString() == "radio.frequency_changed");
+        }
+
+        [Fact]
+        public async Task IntegrationsAddedByAHostRunWhenTheirEventHappens()
+        {
+            var token = TestContext.Current.CancellationToken;
+            var (_, writeKey) = _app.Services.GetRequiredService<ApiKeyStore>().Create("writer", ApiScope.Write);
+
+            using (var types = Authorized(HttpMethod.Get, "/api/v1/integrations/action-types", writeKey))
+            using (var response = await _http.SendAsync(types, token))
+            {
+                var list = await response.Content.ReadFromJsonAsync<JsonElement>(token);
+                Assert.Contains(list.EnumerateArray(), t => t.GetProperty("type").GetString() == RecordingAction.ActionType);
+            }
+
+            long id;
+            using (var invalid = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
+            {
+                invalid.Content = JsonContent.Create(new { name = "", triggers = new[] { "admin.setting_changed" }, action = RecordingAction.ActionType });
+                using var response = await _http.SendAsync(invalid, token);
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(token);
+                Assert.Equal("Enter a name.", body.GetProperty("error").GetString());
+                Assert.Equal("Enter a token.", body.GetProperty("errors").GetProperty("config.token").GetString());
+            }
+
+            using (var create = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
+            {
+                create.Content = JsonContent.Create(new
+                {
+                    name = "Channel limit watch",
+                    triggers = new[] { "admin.setting_changed" },
+                    conditions = new[] { new { field = "setting.key", @operator = "is", value = "CHANNEL_LIMIT" } },
+                    action = RecordingAction.ActionType,
+                    config = new { token = "host-secret-value" }
+                });
+                using var response = await _http.SendAsync(create, token);
+                Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+                var created = await response.Content.ReadFromJsonAsync<JsonElement>(token);
+                id = created.GetProperty("id").GetInt64();
+                Assert.False(created.GetProperty("config").TryGetProperty("token", out _));
+                Assert.Equal("ends in alue", created.GetProperty("storedSecrets").GetProperty("token").GetString());
+            }
+
+            foreach (var (key, value) in new[] { ("CHANNEL_LIMIT", "12"), ("COALITION_AUDIO_SECURITY", "true") })
+            {
+                using var change = Authorized(HttpMethod.Put, "/api/v1/settings/" + key, writeKey);
+                change.Content = JsonContent.Create(new { value });
+                using var response = await _http.SendAsync(change, token);
+                response.EnsureSuccessStatusCode();
+            }
+
+            JsonElement run = default;
+            for (var i = 0; i < 50; i++)
+            {
+                using var runs = Authorized(HttpMethod.Get, $"/api/v1/integrations/runs?integration={id}", writeKey);
+                using var response = await _http.SendAsync(runs, token);
+                var list = (await response.Content.ReadFromJsonAsync<JsonElement>(token)).EnumerateArray().ToList();
+                if (list.Count == 1 && list[0].GetProperty("status").GetString() == "succeeded")
+                {
+                    run = list[0];
+                    break;
+                }
+
+                await Task.Delay(100, token);
+            }
+
+            Assert.Equal(JsonValueKind.Object, run.ValueKind);
+            Assert.Equal("12", run.GetProperty("data").GetProperty("setting").GetProperty("value").GetString());
+            Assert.Equal("api:writer", run.GetProperty("data").GetProperty("event").GetProperty("actor").GetString());
+            var executed = Assert.Single(_action.Runs);
+            Assert.Equal("host-secret-value", executed.Config["token"]!.GetValue<string>());
+
+            using var page = await _http.GetAsync("/login", token);
+            Assert.True(page.IsSuccessStatusCode);
         }
 
         private static HttpRequestMessage Authorized(HttpMethod method, string path, string key)

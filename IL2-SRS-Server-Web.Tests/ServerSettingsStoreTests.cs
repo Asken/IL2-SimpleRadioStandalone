@@ -217,7 +217,7 @@ PRAGMA user_version = 1;";
             using var check = database.Open();
             using var version = check.CreateCommand();
             version.CommandText = "PRAGMA user_version;";
-            Assert.Equal(2L, (long)version.ExecuteScalar());
+            Assert.Equal((long)SrsDatabase.SchemaVersion, (long)version.ExecuteScalar());
         }
 
         [Theory]

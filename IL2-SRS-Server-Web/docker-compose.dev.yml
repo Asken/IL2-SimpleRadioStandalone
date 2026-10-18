@@ -1,0 +1,60 @@
+# Development server with hot reload: runs `dotnet watch` on the source, so edits to .razor, .cs and .css
+# apply to the running server (or restart it when they can't be applied in place).
+#
+#   docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml up -d
+#   docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml logs -f
+#
+# Put SRS_ADMIN_PASSWORD in IL2-SRS-Server-Web/.env (git-ignored). It uses the data volume and ports of a
+# server started from the image (il2-srs-data, 6002, 127.0.0.1:8081), so stop that container first.
+
+services:
+  il2-srs-server-dev:
+    image: il2-srs-server-dev:local
+    build:
+      # Only the inline Dockerfile below is needed; scripts/ keeps the build context small.
+      context: scripts
+      dockerfile_inline: |
+        FROM mcr.microsoft.com/dotnet/sdk:10.0
+        RUN apt-get update && apt-get install -y --no-install-recommends socat && rm -rf /var/lib/apt/lists/*
+    container_name: il2-srs-server-dev
+    restart: unless-stopped
+    working_dir: /src/IL2-SRS-Server-Web
+    # dotnet watch serves the browser refresh WebSocket on localhost only, which Docker can't publish;
+    # socat relays it from all interfaces (8083) so the page's ws://localhost:8082 reaches it.
+    command:
+      - sh
+      - -c
+      - socat TCP-LISTEN:8083,fork,reuseaddr TCP:127.0.0.1:8082 & exec dotnet watch run --non-interactive --no-launch-profile
+    environment:
+      SRS_ADMIN_PASSWORD: ${SRS_ADMIN_PASSWORD:?Set SRS_ADMIN_PASSWORD (at least 8 characters)}
+      SRS_DATA_DIR: /data
+      SRS_SERVER_PORT: "6002"
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      # Docker Desktop doesn't pass Windows file change events into containers, so poll for changes.
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      # Lets the page in the browser refresh after CSS changes and restarts.
+      DOTNET_WATCH_AUTO_RELOAD_WS_HOSTNAME: localhost
+      DOTNET_WATCH_AUTO_RELOAD_WS_PORT: "8082"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    ports:
+      - "6002:6002/tcp"
+      - "6002:6002/udp"
+      - "127.0.0.1:8081:8080/tcp"
+      - "127.0.0.1:8082:8083/tcp"
+    volumes:
+      # The repository root: the server compiles ../IL2-SR-Common too.
+      - ..:/src
+      # Keep the container's build output and packages apart from Windows builds of the same folders.
+      - dev-bin:/src/IL2-SRS-Server-Web/bin
+      - dev-obj:/src/IL2-SRS-Server-Web/obj
+      - dev-nuget:/root/.nuget/packages
+      - il2-srs-data:/data
+
+volumes:
+  dev-bin:
+  dev-obj:
+  dev-nuget:
+  il2-srs-data:
+    external: true

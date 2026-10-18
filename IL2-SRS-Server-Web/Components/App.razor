@@ -29,7 +29,8 @@
             <a class="btn btn-primary reconnect-reload" href="">Reload page</a>
         </div>
     </div>
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @* Started from app.js with faster reconnect retries. *@
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
 </body>
 
 </html>

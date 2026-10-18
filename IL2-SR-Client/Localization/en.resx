@@ -732,6 +732,69 @@
   <data name="Mute / Unmute Radio 2" xml:space="preserve">
     <value>Mute / Unmute Radio 2</value>
   </data>
+  <data name="Restart SRS to finish switching to or from the Classic theme." xml:space="preserve">
+    <value>Restart SRS to finish switching to or from the Classic theme.</value>
+  </data>
+  <data name="Restart SRS now?" xml:space="preserve">
+    <value>Restart SRS now?</value>
+  </data>
+  <data name="RCI Controller" xml:space="preserve">
+    <value>RCI Controller</value>
+  </data>
+  <data name="RCI Controller mode" xml:space="preserve">
+    <value>RCI Controller mode</value>
+  </data>
+  <data name="Access code" xml:space="preserve">
+    <value>Access code</value>
+  </data>
+  <data name="Use code" xml:space="preserve">
+    <value>Use code</value>
+  </data>
+  <data name="Paste your personal access code from the Combat Box RCI dashboard." xml:space="preserve">
+    <value>Paste your personal access code from the Combat Box RCI dashboard.</value>
+  </data>
+  <data name="RCI Controller mode is off for now: {0}" xml:space="preserve">
+    <value>RCI Controller mode is off for now: {0}</value>
+  </data>
+  <data name="Paste a new access code under Settings &gt; RCI Controller." xml:space="preserve">
+    <value>Paste a new access code under Settings &gt; RCI Controller.</value>
+  </data>
+  <data name="Cannot connect as an RCI controller: {0}" xml:space="preserve">
+    <value>Cannot connect as an RCI controller: {0}</value>
+  </data>
+  <data name="Paste a new access code under Settings &gt; RCI Controller, or switch RCI Controller mode off." xml:space="preserve">
+    <value>Paste a new access code under Settings &gt; RCI Controller, or switch RCI Controller mode off.</value>
+  </data>
+  <data name="Active as {0} ({1}) until {2}." xml:space="preserve">
+    <value>Active as {0} ({1}) until {2}.</value>
+  </data>
+  <data name="Allies" xml:space="preserve">
+    <value>Allies</value>
+  </data>
+  <data name="Axis" xml:space="preserve">
+    <value>Axis</value>
+  </data>
+  <data name="Switch on to use SRS as a Combat Box RCI controller without IL-2. You need a personal access code from the RCI dashboard." xml:space="preserve">
+    <value>Switch on to use SRS as a Combat Box RCI controller without IL-2. You need a personal access code from the RCI dashboard.</value>
+  </data>
+  <data name="This version of SRS cannot check RCI access codes yet." xml:space="preserve">
+    <value>This version of SRS cannot check RCI access codes yet.</value>
+  </data>
+  <data name="Your access code has expired. Get a new one from the RCI dashboard." xml:space="preserve">
+    <value>Your access code has expired. Get a new one from the RCI dashboard.</value>
+  </data>
+  <data name="That access code was not issued by the Combat Box RCI dashboard." xml:space="preserve">
+    <value>That access code was not issued by the Combat Box RCI dashboard.</value>
+  </data>
+  <data name="That is not a valid access code. Copy it again from the RCI dashboard." xml:space="preserve">
+    <value>That is not a valid access code. Copy it again from the RCI dashboard.</value>
+  </data>
+  <data name="Create an &quot;RCI Controller&quot; profile with your current key bindings, Radio 1 in your left ear and Radio 2 in your right?" xml:space="preserve">
+    <value>Create an "RCI Controller" profile with your current key bindings, Radio 1 in your left ear and Radio 2 in your right?</value>
+  </data>
+  <data name="RCI controller: {0}" xml:space="preserve">
+    <value>RCI controller: {0}</value>
+  </data>
   <data name="Fit height to pilots" xml:space="preserve">
     <value>Fit height to pilots</value>
   </data>

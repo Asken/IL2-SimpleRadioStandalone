@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
 using Microsoft.AspNetCore.Builder;
@@ -35,9 +37,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
 
     public sealed record BanAddressRequest(string IpAddress, string PlayerName, string Reason, int? DurationMinutes);
 
-    public sealed record EventResponse(long Id, DateTime OccurredAtUtc, string Category, string Actor, string Message);
+    public sealed record EventResponse(long Id, DateTime OccurredAtUtc, string Category, string Type, string Actor,
+        string Message, string ClientGuid, JsonElement? Payload);
+
+    public sealed record EventFieldResponse(string Path, string Type, string Description);
+
+    public sealed record EventTypeResponse(string Type, string Category, string Label, string Description,
+        IReadOnlyList<EventFieldResponse> Fields);
 
     public sealed record ErrorResponse(string Error);
+
+    /// <summary>A rejected request: the first problem, and every problem keyed by field.</summary>
+    public sealed record ValidationErrorResponse(string Error, IReadOnlyDictionary<string, string> Errors);
 
     /// <summary>
     /// REST API under /api/v1. Requires an API key; GET needs the read scope, everything else the write scope.
@@ -140,12 +151,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
                 .WithSummary("Remove a ban");
 
             // Events
-            api.MapGet("/events", (string category, string search, DateTime? since, int? limit, AuditLog audit) =>
-                    audit.Query(category, search, since?.ToUniversalTime(), limit ?? 200).Select(ToEvent))
-                .WithSummary("Event log, newest first (category: server, client, admin, auth; limit up to 1000)");
+            api.MapGet("/events", (string category, string type, string client, string search, DateTime? since, int? limit,
+                        AuditLog audit) =>
+                    audit.Query(category, search, since?.ToUniversalTime(), limit ?? 200, type, client).Select(ToEvent))
+                .WithSummary("Event log, newest first (category: server, client, radio, admin, auth; type: see " +
+                             "/event-types; client: client guid; limit up to 1000)");
+            api.MapGet("/event-types", () => SrsEventTypes.All.Select(ToEventType))
+                .WithSummary("Event types with their payload fields");
             Write(api.MapDelete("/events", (AuditLog audit, ClaimsPrincipal user) =>
                     Results.Ok(new { deleted = audit.Clear(Actor(user)) })))
                 .WithSummary("Clear the event log");
+
+            IntegrationEndpoints.Map(api);
 
             // Server lifecycle
             Write(api.MapPost("/server/start", (ServerAdminService admin, ClaimsPrincipal user) =>
@@ -242,8 +259,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
 
         private static EventResponse ToEvent(AuditEvent auditEvent)
         {
-            return new EventResponse(auditEvent.Id, auditEvent.OccurredAtUtc, auditEvent.Category, auditEvent.Actor,
-                auditEvent.Message);
+            return new EventResponse(auditEvent.Id, auditEvent.OccurredAtUtc, auditEvent.Category, auditEvent.Type,
+                auditEvent.Actor, auditEvent.Message, auditEvent.ClientGuid,
+                auditEvent.Payload == null ? null : JsonDocument.Parse(auditEvent.Payload).RootElement.Clone());
+        }
+
+        private static EventTypeResponse ToEventType(SrsEventType eventType)
+        {
+            return new EventTypeResponse(eventType.Type, eventType.Category, eventType.Label, eventType.Description,
+                eventType.Fields.Select(f => new EventFieldResponse(f.Path, f.Type, f.Description)).ToList());
         }
 
         private static string Blank(string value)

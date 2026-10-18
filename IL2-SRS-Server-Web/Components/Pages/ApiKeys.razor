@@ -22,11 +22,15 @@
 
 <section class="panel">
     <h2>Create a key</h2>
-    <form class="inline-form" @onsubmit="Create">
-        <label class="grow">
-            <span>Name</span>
-            <input type="text" required maxlength="64" placeholder="Discord bot" @bind="_name" />
-        </label>
+    <form class="inline-form" novalidate @onsubmit="Create">
+        <div class="form-field grow">
+            <label for="key-name">Name</label>
+            <input id="key-name" type="text" maxlength="@ApiKeyStore.MaxNameLength" placeholder="Discord bot"
+                   aria-invalid="@FieldError.Invalid(NameError)"
+                   aria-describedby="@FieldError.DescribedBy("key-name-error", NameError)"
+                   @ref="_nameInput" @bind="_name" @bind:event="oninput" @onblur="() => _form.Touch(NameField)" />
+            <FieldError Id="key-name-error" Message="@NameError" />
+        </div>
         <label>
             <span>Access</span>
             <select @bind="_scope">
@@ -34,7 +38,10 @@
                 <option value="@ApiScope.Write">Write</option>
             </select>
         </label>
-        <button type="submit" class="btn btn-primary">Create</button>
+        <div class="form-button">
+            <span aria-hidden="true">&nbsp;</span>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </div>
     </form>
     @if (_error != null)
     {
@@ -100,18 +107,31 @@ else
     private string _scope = ApiScope.Read;
     private string _newKey;
     private string _error;
+    private readonly FormState _form = new();
+    private ElementReference _nameInput;
 
+    private const string NameField = "name";
+    private string NameError => _form.Show(NameField, ApiKeyStore.ValidateName(_name));
     private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
 
     protected override void OnInitialized() => _keys = Admin.GetApiKeys();
 
-    private void Create()
+    private async Task Create()
     {
         _error = null;
+        _form.Submit();
+        if (NameError != null)
+        {
+            _newKey = null;
+            await _nameInput.FocusAsync();
+            return;
+        }
+
         try
         {
             _newKey = Admin.CreateApiKey(_name, _scope, Actor, out _);
             _name = null;
+            _form.Reset();
         }
         catch (InvalidOperationException ex)
         {
