@@ -58,6 +58,8 @@
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="System" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <Choose>
@@ -86,6 +88,8 @@
     <Compile Include="Installer\LegacyAssemblyCleanupTests.cs" />
     <Compile Include="Installer\SrsInstallConsolidatorTests.cs" />
     <Compile Include="Settings\ChannelNameSetTests.cs" />
+    <Compile Include="Settings\RciAccessCodeTests.cs" />
+    <Compile Include="Settings\RciControllerModeTests.cs" />
     <Compile Include="Settings\UserDataPathsTests.cs" />
     <Compile Include="Settings\DefaultServerSettingsTests.cs" />
     <Compile Include="Network\CombatBoxCallsignRosterTests.cs" />
@@ -104,6 +108,7 @@
     <Compile Include="UI\RciOverlayMessageDelayTests.cs" />
     <Compile Include="UI\RadioOverlayChannelLimitTests.cs" />
     <Compile Include="UI\ServerWindowLayoutTests.cs" />
+    <Compile Include="UI\ThemePaletteTests.cs" />
     <Compile Include="UI\ServerHealthSnapshotTests.cs" />
     <Compile Include="UI\ClientAdminPresentationTests.cs" />
     <Compile Include="UI\RadioOverlaySpeakerNameScrollTests.cs" />

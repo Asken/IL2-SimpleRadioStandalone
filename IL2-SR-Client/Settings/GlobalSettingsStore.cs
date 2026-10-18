@@ -95,7 +95,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
 
         // Set only when the user drags a roster edge. Replaces 1.0.5.0-beta.1's PilotRosterManuallySized,
         // which was also guessed from old saved heights and disabled auto-fit for most upgraded users.
-        PilotRosterUserResized
+        PilotRosterUserResized,
+
+        // RCI Controller mode (see RciControllerMode): switched on in Settings, unlocked by a personal access
+        // code from the Combat Box RCI dashboard.
+        RciControllerEnabled,
+        RciAccessCode
     }
 
     public enum InputBinding
@@ -359,6 +364,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
             {GlobalSettingsKeys.AutoStartRadioOverlay.ToString(), "true"},
             {GlobalSettingsKeys.AutoStartPilotRoster.ToString(), "false"},
             {GlobalSettingsKeys.PilotRosterUserResized.ToString(), "false"},
+            {GlobalSettingsKeys.RciControllerEnabled.ToString(), "false"},
+            {GlobalSettingsKeys.RciAccessCode.ToString(), ""},
             {GlobalSettingsKeys.RefocusIL2.ToString(), "false"},
             {GlobalSettingsKeys.ExpandControls.ToString(), "false"},
 

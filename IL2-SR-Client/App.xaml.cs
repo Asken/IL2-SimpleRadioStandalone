@@ -14,6 +14,7 @@ using System.Windows;
 using System.Windows.Media;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Localization;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Settings;
+using Ciribob.IL2.SimpleRadio.Standalone.Client.Themes;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.UI.ClientWindow.Diagnostics;
 using Ciribob.IL2.SimpleRadio.Standalone.Client.Utils;
 using MahApps.Metro.Controls;
@@ -127,7 +128,9 @@ namespace IL2_SR_Client
         public static void ApplyThreeDEffectSetting()
         {
             ClearFlattenedBrushOverrides(Current.Resources);
-            var effectsEnabled = GlobalSettingsStore.Instance.GetClientSettingBool(GlobalSettingsKeys.ThreeDEffectsEnabled);
+            // Classic is flat, as 1.0.2.0 was; the saved 3D setting is kept for the other themes.
+            var effectsEnabled = GlobalSettingsStore.Instance.GetClientSettingBool(GlobalSettingsKeys.ThreeDEffectsEnabled) &&
+                                 !UiTheme.IsClassicSelected();
             Current.Resources["ThreeDEffectOpacity"] = effectsEnabled ? 1.0 : 0.0;
             Current.Resources["ThreeDGlassOpacity"] = effectsEnabled ? 1.0 : 0.0;
             Current.Resources["ThreeDScrewOpacity"] = effectsEnabled ? 1.0 : 0.0;
@@ -245,6 +248,11 @@ namespace IL2_SR_Client
             if (normalizedTheme == "white")
             {
                 return "Themes/MilitaryPaletteWhite.xaml";
+            }
+
+            if (normalizedTheme == "classic")
+            {
+                return "Themes/MilitaryPaletteClassic.xaml";
             }
 
             return null;

@@ -1,6 +1,7 @@
 <controls:MetroWindow xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         x:Class="Ciribob.IL2.SimpleRadio.Standalone.Client.UI.InputProfileWindow.InputProfileWindow"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:themes="clr-namespace:Ciribob.IL2.SimpleRadio.Standalone.Client.Themes"
         xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
         Title="Profile Name"
         WindowStartupLocation="CenterOwner"
@@ -20,7 +21,7 @@
     <controls:MetroWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/IL2-SR-ClientRadio;component/Themes/MilitaryControls.xaml" />
+                <themes:ThemeControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </controls:MetroWindow.Resources>
@@ -31,7 +32,7 @@
                        VerticalAlignment="Center"
                        FontFamily="{StaticResource MilFontStencil}"
                        FontSize="17"
-                       Foreground="{DynamicResource MilAccentBrush}"
+                       Foreground="{DynamicResource MilTitleTextBrush}"
                        Text="{Binding Converter={StaticResource MilUpperConverter}}" />
         </DataTemplate>
     </controls:MetroWindow.TitleTemplate>

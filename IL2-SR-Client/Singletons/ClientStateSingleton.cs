@@ -80,6 +80,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Singletons
         {
             get
             {
+                // An RCI controller is known by its codename, whatever name IL-2 last reported.
+                // Checked first: the game lookup below scans the running processes.
+                var controllerName = RciControllerMode.RadioName;
+                if (controllerName != null)
+                {
+                    return controllerName;
+                }
+
                 var settings = GlobalSettingsStore.Instance;
                 var gameKey = GetActiveGameNameKey();
                 var gameName = gameKey.HasValue

@@ -394,7 +394,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Overlay
 
             var assignedCallsign = ConnectedClientsSingleton.Instance.GetOwnAssignedCallsign();
             var hasAssignedCallsign = !string.IsNullOrWhiteSpace(assignedCallsign);
-            var showRequestPrompt = !hasAssignedCallsign;
+            // Asking for a callsign is for pilots, not for an RCI controller.
+            var showRequestPrompt = !hasAssignedCallsign && !RciControllerMode.IsActive;
             var friendlyRciCallsigns = _clientStateSingleton.PlayerGameState != null
                 ? ConnectedClientsSingleton.Instance.GetFriendlyRciCallsign(_clientStateSingleton.PlayerGameState.coalition)
                 : string.Empty;
