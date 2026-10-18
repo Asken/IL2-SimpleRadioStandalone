@@ -105,6 +105,8 @@ PRAGMA user_version = 1;";
         [InlineData(2, false)]
         // This branch before the merge: version 3 had typed events and integrations, but no coalition names.
         [InlineData(3, true)]
+        // A newer build or another branch numbered it past this build's migrations, without some of its tables.
+        [InlineData(99, false)]
         public void UpgradesDatabasesNumberedByOtherBuilds(int userVersion, bool hasTypedEvents)
         {
             using var temp = new TempDirectory();
