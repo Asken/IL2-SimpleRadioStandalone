@@ -51,7 +51,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins
         /// <summary>The server's configuration: environment, srs-server.json and command line.</summary>
         public IConfiguration Configuration { get; }
 
-        /// <summary>The plugin's own folder for its data (plugins/&lt;id&gt; in the data directory); it exists.</summary>
+        /// <summary>The plugin's own folder for its data (plugin-data/&lt;id&gt; in the data directory); it exists.</summary>
         public string DataDirectory { get; }
 
         /// <summary>The server's data directory.</summary>
