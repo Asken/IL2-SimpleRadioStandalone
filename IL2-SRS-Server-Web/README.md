@@ -281,13 +281,17 @@ return. Plugins are built against the SDK's major version; the server refuses pl
 A host can also compile plugins in: reference this project and call `Program.Run(args, builder =>
 builder.AddServerPlugin(new MyPlugin()))` from its own `Main`.
 
+[`IL2-SRS-Plugin-Sample`](../IL2-SRS-Plugin-Sample) is a complete minimal plugin (a page, a stylesheet, an event
+type and an API endpoint); the server's tests install it from a plugin folder.
+
 ## Development
 
 Requires the .NET 10 SDK.
 
 ```sh
 dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWORD=dev-password
-dotnet test --project IL2-SRS-Server-Web.Tests
+dotnet test --project IL2-SRS-Server-Web.Tests            # the server, without plugins
+dotnet test --project IL2-SRS-Plugin-Integrations.Tests    # the integrations plugin, hosted by the server
 ```
 
 [`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload
