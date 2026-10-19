@@ -62,7 +62,8 @@
 }
 else
 {
-    <div class="table-wrap">
+    @* A card per run on phones (integrations.css); data-label names the field there. *@
+    <div class="table-wrap mobile-cards">
         <table class="grid events">
             <thead>
                 <tr>
@@ -81,24 +82,24 @@ else
                     var expanded = _expanded.Contains(run.Id);
                     <tr @key="run.Id" class="expandable" aria-expanded="@expanded.ToString().ToLowerInvariant()"
                         @onclick="() => Toggle(run.Id)">
-                        <td><LocalTime Value="run.CreatedAtUtc" Format="seconds" /></td>
-                        <td>@run.IntegrationName</td>
-                        <td>
+                        <td data-label="Queued"><LocalTime Value="run.CreatedAtUtc" Format="seconds" /></td>
+                        <td class="card-title">@run.IntegrationName</td>
+                        <td data-label="Event">
                             <code>@run.EventType</code>
                             @if (!string.IsNullOrEmpty(run.EventMessage))
                             {
                                 <div class="muted small">@run.EventMessage</div>
                             }
                         </td>
-                        <td class="nowrap">
+                        <td class="nowrap card-corner">
                             <StatusPill Status="@run.Status" />
                             @if (run.Status == ExecutionStatus.Queued && run.Attempts > 0 && run.NextAttemptAtUtc.HasValue)
                             {
                                 <div class="muted small">retry at <LocalTime Value="run.NextAttemptAtUtc.Value" Format="time" /></div>
                             }
                         </td>
-                        <td class="num">@run.Attempts</td>
-                        <td>@(run.LastError ?? run.Result)</td>
+                        <td class="num" data-label="Attempts">@run.Attempts</td>
+                        <td data-label="Result">@(run.LastError ?? run.Result)</td>
                         <td class="actions-col" @onclick:stopPropagation="true">
                             @if (ExecutionStatus.IsFinished(run.Status))
                             {
