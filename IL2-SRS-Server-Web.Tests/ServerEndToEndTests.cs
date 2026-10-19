@@ -12,7 +12,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Hosting;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -32,7 +31,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         private const string ClientGuid = "EndToEndClientGuid0001";
 
         private readonly TempDirectory _data = new TempDirectory();
-        private readonly RecordingAction _action = new RecordingAction();
         private WebApplication _app;
         private HttpClient _http;
         private int _srsPort;
@@ -50,10 +48,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
                 "--SRS_SERVER_PORT=" + _srsPort
             }), builder =>
             {
-                // What a host building on the server does: compile in a plugin, add an action and an admin link.
-                builder.AddServerPlugin(new IntegrationsPlugin());
-                builder.Services.AddSingleton(_action);
-                builder.Services.AddIntegrationAction<RecordingAction>();
+                // What a host building on the server does: add an admin link.
                 builder.Services.AddAdminNavItem("workflows", "Workflows");
             });
             await _app.StartAsync(TestContext.Current.CancellationToken);
@@ -226,81 +221,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             using var typesResponse = await _http.SendAsync(types, token);
             var typeList = await typesResponse.Content.ReadFromJsonAsync<JsonElement>(token);
             Assert.Contains(typeList.EnumerateArray(), t => t.GetProperty("type").GetString() == "radio.frequency_changed");
-        }
-
-        [Fact]
-        public async Task IntegrationsAddedByAHostRunWhenTheirEventHappens()
-        {
-            var token = TestContext.Current.CancellationToken;
-            var (_, writeKey) = _app.Services.GetRequiredService<ApiKeyStore>().Create("writer", ApiScope.Write);
-
-            using (var types = Authorized(HttpMethod.Get, "/api/v1/integrations/action-types", writeKey))
-            using (var response = await _http.SendAsync(types, token))
-            {
-                var list = await response.Content.ReadFromJsonAsync<JsonElement>(token);
-                Assert.Contains(list.EnumerateArray(), t => t.GetProperty("type").GetString() == RecordingAction.ActionType);
-            }
-
-            long id;
-            using (var invalid = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
-            {
-                invalid.Content = JsonContent.Create(new { name = "", triggers = new[] { "admin.setting_changed" }, action = RecordingAction.ActionType });
-                using var response = await _http.SendAsync(invalid, token);
-                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(token);
-                Assert.Equal("Enter a name.", body.GetProperty("error").GetString());
-                Assert.Equal("Enter a token.", body.GetProperty("errors").GetProperty("config.token").GetString());
-            }
-
-            using (var create = Authorized(HttpMethod.Post, "/api/v1/integrations", writeKey))
-            {
-                create.Content = JsonContent.Create(new
-                {
-                    name = "Channel limit watch",
-                    triggers = new[] { "admin.setting_changed" },
-                    conditions = new[] { new { field = "setting.key", @operator = "is", value = "CHANNEL_LIMIT" } },
-                    action = RecordingAction.ActionType,
-                    config = new { token = "host-secret-value" }
-                });
-                using var response = await _http.SendAsync(create, token);
-                Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-                var created = await response.Content.ReadFromJsonAsync<JsonElement>(token);
-                id = created.GetProperty("id").GetInt64();
-                Assert.False(created.GetProperty("config").TryGetProperty("token", out _));
-                Assert.Equal("ends in alue", created.GetProperty("storedSecrets").GetProperty("token").GetString());
-            }
-
-            foreach (var (key, value) in new[] { ("CHANNEL_LIMIT", "12"), ("COALITION_AUDIO_SECURITY", "true") })
-            {
-                using var change = Authorized(HttpMethod.Put, "/api/v1/settings/" + key, writeKey);
-                change.Content = JsonContent.Create(new { value });
-                using var response = await _http.SendAsync(change, token);
-                response.EnsureSuccessStatusCode();
-            }
-
-            JsonElement run = default;
-            for (var i = 0; i < 50; i++)
-            {
-                using var runs = Authorized(HttpMethod.Get, $"/api/v1/integrations/runs?integration={id}", writeKey);
-                using var response = await _http.SendAsync(runs, token);
-                var list = (await response.Content.ReadFromJsonAsync<JsonElement>(token)).EnumerateArray().ToList();
-                if (list.Count == 1 && list[0].GetProperty("status").GetString() == "succeeded")
-                {
-                    run = list[0];
-                    break;
-                }
-
-                await Task.Delay(100, token);
-            }
-
-            Assert.Equal(JsonValueKind.Object, run.ValueKind);
-            Assert.Equal("12", run.GetProperty("data").GetProperty("setting").GetProperty("value").GetString());
-            Assert.Equal("api:writer", run.GetProperty("data").GetProperty("event").GetProperty("actor").GetString());
-            var executed = Assert.Single(_action.Runs);
-            Assert.Equal("host-secret-value", executed.Config["token"]!.GetValue<string>());
-
-            using var page = await _http.GetAsync("/login", token);
-            Assert.True(page.IsSuccessStatusCode);
         }
 
         internal static HttpRequestMessage Authorized(HttpMethod method, string path, string key)

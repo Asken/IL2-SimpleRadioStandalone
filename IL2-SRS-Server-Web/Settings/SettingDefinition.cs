@@ -91,10 +91,10 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Settings
                 "Append the majority squad tag to channel names above channel 2.", SettingKind.Toggle),
 
             new SettingDefinition(ServerSettingsKeys.SERVER_NAME, ServerGroup, "Server Name",
-                "Shown in integration messages as server.name. Empty uses the host name.", SettingKind.Text),
+                "How plugins name this server (IServerInfo.Name). Empty uses the host name.", SettingKind.Text),
             new SettingDefinition(ServerSettingsKeys.PUBLIC_ADMIN_URL, ServerGroup, "Public Admin URL",
-                "Where admins reach this page, e.g. https://srs.example.com. Integration messages can link to it " +
-                "as server.adminUrl.", SettingKind.Url),
+                "Where admins reach this page, e.g. https://srs.example.com. Plugins can link to it " +
+                "(IServerInfo.AdminUrl).", SettingKind.Url),
             new SettingDefinition(ServerSettingsKeys.SERVER_PORT, ServerGroup, "Server Port",
                 "TCP and UDP port clients connect to.", SettingKind.Number, 1, 65535, requiresRestart: true),
             new SettingDefinition(ServerSettingsKeys.CLIENT_EXPORT_ENABLED, ServerGroup, "Auto Export List",

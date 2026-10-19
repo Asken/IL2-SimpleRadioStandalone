@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
+namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
 {
     /// <summary>Answers webhook requests with scripted responses and remembers what was sent.</summary>
     internal sealed class FakeWebhook : HttpMessageHandler, IHttpClientFactory
