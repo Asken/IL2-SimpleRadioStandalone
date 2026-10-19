@@ -36,7 +36,8 @@
 }
 else
 {
-    <div class="table-wrap">
+    @* A card per integration on phones (integrations.css); data-label names the field there. *@
+    <div class="table-wrap mobile-cards">
         <table class="grid">
             <thead>
                 <tr>
@@ -53,7 +54,7 @@ else
                 {
                     _latest.TryGetValue(integration.Id, out var last);
                     <tr @key="integration.Id" class="@(integration.Enabled ? null : "row-muted")">
-                        <td>
+                        <td class="card-corner">
                             <label class="switch" title="@(integration.Enabled ? "Disable" : "Enable")">
                                 <input type="checkbox" role="switch" checked="@integration.Enabled"
                                        aria-label="Enabled"
@@ -61,14 +62,14 @@ else
                                 <span class="switch-track" aria-hidden="true"></span>
                             </label>
                         </td>
-                        <td>
+                        <td class="card-title">
                             <a href="integrations/@integration.Id">@integration.Name</a>
                             @if (!string.IsNullOrEmpty(integration.Description))
                             {
                                 <div class="muted small">@integration.Description</div>
                             }
                         </td>
-                        <td>
+                        <td data-label="When">
                             @foreach (var trigger in integration.TriggerTypes)
                             {
                                 <div>@(Service.EventTypes.Find(trigger)?.Label ?? trigger)</div>
@@ -80,8 +81,8 @@ else
                                 </div>
                             }
                         </td>
-                        <td>@(Service.FindAction(integration.ActionType)?.Label ?? integration.ActionType + " (not available)")</td>
-                        <td class="nowrap">
+                        <td data-label="Then">@(Service.FindAction(integration.ActionType)?.Label ?? integration.ActionType + " (not available)")</td>
+                        <td class="nowrap" data-label="Last run">
                             @if (last != null)
                             {
                                 <a href="integrations/runs?integration=@integration.Id" class="plain-link">
