@@ -36,7 +36,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
             services.AddEventTypes(IntegrationEventTypes.All);
             services.AddAdminNavItem("integrations", "Integrations");
-            services.AddAdminNavItem("integration-runs", "Integration Runs");
             services.AddAdminStylesheet(AdminExtensions.PluginFile(PluginId, "integrations.css"));
         }
 

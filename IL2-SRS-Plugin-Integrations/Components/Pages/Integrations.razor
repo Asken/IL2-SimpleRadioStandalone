@@ -8,7 +8,7 @@
 <div class="page-head">
     <h1>Integrations</h1>
     <div class="actions">
-        <a class="btn btn-quiet" href="integration-runs">Runs</a>
+        <a class="btn btn-quiet" href="integrations/runs">Runs</a>
         <a class="btn btn-primary" href="integrations/new">New integration</a>
     </div>
 </div>
@@ -16,7 +16,7 @@
 <p class="muted">
     An integration runs an action, such as posting to a Discord channel, when an event happens on the server.
     Conditions narrow it down, for example to one coalition. Runs are queued, retried if the integration allows it,
-    and listed under <a href="integration-runs">Integration Runs</a>.
+    and listed under <a href="integrations/runs">Runs</a>.
 </p>
 
 @if (_error != null)
@@ -84,7 +84,7 @@ else
                         <td class="nowrap">
                             @if (last != null)
                             {
-                                <a href="integration-runs?integration=@integration.Id" class="plain-link">
+                                <a href="integrations/runs?integration=@integration.Id" class="plain-link">
                                     <StatusPill Status="@last.Status" />
                                     <LocalTime Value="last.CreatedAtUtc" Format="seconds" />
                                 </a>

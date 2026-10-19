@@ -2,6 +2,7 @@
 @inject ServerAdminService Admin
 @inject AdminAuthOptions AuthOptions
 @inject IEnumerable<AdminNavItem> ExtraNavItems
+@inject NavigationManager Navigation
 
 <div class="shell">
     <header class="topbar">
@@ -40,8 +41,12 @@
         <NavLink href="plugins">Plugins</NavLink>
     </nav>
 
-    <main class="content">
-        @Body
+    @* Only the content scrolls. A new element per page, so each page starts at the top (the router only
+       scrolls the window); filters that change the query string keep their place. *@
+    <main class="content" @key="new Uri(Navigation.Uri).AbsolutePath">
+        <div class="content-inner">
+            @Body
+        </div>
     </main>
 </div>
 

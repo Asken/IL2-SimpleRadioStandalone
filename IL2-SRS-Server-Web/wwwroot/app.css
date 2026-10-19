@@ -179,13 +179,21 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .sidenav a:hover { background: var(--surface-2); }
 .sidenav a.active { background: var(--accent); color: var(--accent-text); }
 
-.content { grid-area: main; padding: 1.25rem 1.5rem 3rem; max-width: 1200px; width: 100%; }
+.content { grid-area: main; min-width: 0; }
+.content-inner { padding: 1.25rem 1.5rem 3rem; max-width: 1200px; }
+
+/* Side by side, the top bar and menu stay put and only the content scrolls. */
+@media (min-width: 761px) {
+    .shell { height: 100vh; min-height: 0; }
+    .sidenav { overflow-y: auto; }
+    .content { overflow-y: auto; }
+}
 
 @media (max-width: 760px) {
     .shell { grid-template-columns: 1fr; grid-template-areas: "top" "nav" "main"; }
     .sidenav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: .5rem; }
     .sidenav a { white-space: nowrap; }
-    .content { padding: 1rem; }
+    .content-inner { padding: 1rem; }
     .topbar-meta { display: none; }
 }
 

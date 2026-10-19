@@ -20,7 +20,7 @@ What it adds over the WPF server:
 - Plugins add pages, API endpoints and event handling without changing the server. See [Plugins](#plugins).
 - Integrations (a plugin, included in the image): run an action when an event happens, optionally only when the
   event data matches conditions (for example only Red pilots). Runs are queued, kept across restarts, retried if
-  configured and listed under **Integration Runs**. Built-in actions: **Post to Discord** (webhook, plain message or
+  configured and listed under **Runs** on the Integrations page. Built-in actions: **Post to Discord** (webhook, plain message or
   card) and **Send an HTTP request** (any URL, e.g. Slack or Teams webhooks). See [Integrations](#integrations).
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
