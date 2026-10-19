@@ -101,10 +101,11 @@ PRAGMA user_version = 1;";
         }
 
         [Theory]
-        // Upstream 1.0.5.0: version 2 is the coalition channel names, without typed events or integrations.
+        // Upstream 1.0.5.0: version 2 is the coalition channel names, without typed events.
         [InlineData(2, false)]
-        // This branch before the merge: version 3 had typed events and integrations, but no coalition names.
-        [InlineData(3, true)]
+        // This fork's databases before the integrations plugin: version 5, with typed events and integration
+        // tables (which the plugin moves out), here without the coalition names.
+        [InlineData(5, true)]
         // A newer build or another branch numbered it past this build's migrations, without some of its tables.
         [InlineData(99, false)]
         public void UpgradesDatabasesNumberedByOtherBuilds(int userVersion, bool hasTypedEvents)
@@ -133,8 +134,7 @@ PRAGMA user_version = " + userVersion + ";";
             using var check = database.Open();
             foreach (var (table, column) in new[]
                      {
-                         ("events", "payload"), ("coalition_channel_names", "name"),
-                         ("integrations", "name"), ("integration_executions", "status"), ("integration_state", "value")
+                         ("events", "payload"), ("events", "client_guid"), ("coalition_channel_names", "name")
                      })
             {
                 using var columns = check.CreateCommand();

@@ -4,7 +4,7 @@
 @using System.Text.Json.Nodes
 @using Microsoft.JSInterop
 @inject IntegrationService Integrations
-@inject AdminAuthOptions AuthOptions
+@inject IAdminActor AdminActor
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -75,7 +75,7 @@
             @foreach (var category in EventCategory.All)
             {
                 <optgroup label="@category">
-                    @foreach (var eventType in SrsEventTypes.All.Where(t => t.Category == category && !_triggerTypes.Contains(t.Type)))
+                    @foreach (var eventType in Integrations.EventTypes.All.Where(t => t.Category == category && !_triggerTypes.Contains(t.Type)))
                     {
                         <option value="@eventType.Type">@eventType.Label (@eventType.Type)</option>
                     }
@@ -271,9 +271,9 @@
     private bool _focusFirstError;
 
     private IReadOnlyList<SrsEventType> Triggers =>
-        _triggerTypes.Select(SrsEventTypes.Find).Where(t => t != null).ToList();
+        _triggerTypes.Select(Integrations.EventTypes.Find).Where(t => t != null).ToList();
     private IIntegrationAction Action => Integrations.FindAction(_actionType);
-    private string Actor => AuthOptions.Disabled ? "admin (no login)" : "admin";
+    private string Actor => AdminActor.Name;
 
     private Dictionary<string, object> EditorParameters => new()
     {

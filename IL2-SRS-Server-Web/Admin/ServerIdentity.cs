@@ -1,17 +1,14 @@
 using System;
-using System.Text.Json.Nodes;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
 using Microsoft.Extensions.Configuration;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 {
-    /// <summary>
-    /// Which server this is: its name, host, version and admin address, added to the <c>server.*</c> data of
-    /// every event integrations see.
-    /// </summary>
-    public sealed class ServerIdentity
+    /// <summary>Which server this is: its name, host, version and admin address (for plugins).</summary>
+    public sealed class ServerIdentity : IServerInfo
     {
         /// <summary>The image version, set by the Dockerfile from its VERSION build argument.</summary>
         public const string ImageVersionKey = "SRS_IMAGE_VERSION";
@@ -43,18 +40,6 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         /// <summary>The Public admin URL setting, or null.</summary>
         public string AdminUrl => Text(ServerSettingsKeys.PUBLIC_ADMIN_URL);
-
-        /// <summary>The identity fields of the <c>server</c> section of event data.</summary>
-        public JsonObject Section()
-        {
-            return new JsonObject
-            {
-                ["name"] = Name,
-                ["hostname"] = Hostname,
-                ["version"] = Version,
-                ["adminUrl"] = AdminUrl
-            };
-        }
 
         private string Text(ServerSettingsKeys key)
         {

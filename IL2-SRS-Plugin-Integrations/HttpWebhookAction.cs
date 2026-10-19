@@ -9,7 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Components.Integrations;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Components;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {

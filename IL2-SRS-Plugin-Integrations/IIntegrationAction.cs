@@ -5,12 +5,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {
     /// <summary>
     /// Something an integration can do when its trigger event happens, such as posting to a Discord webhook.
-    /// Register implementations with <see cref="ServerExtensions.AddIntegrationAction{T}"/>; they are singletons.
+    /// Register implementations with <see cref="IntegrationServiceExtensions.AddIntegrationAction{T}"/>; they are singletons.
     /// </summary>
     public interface IIntegrationAction
     {
@@ -117,6 +119,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                    value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
                 ? text
                 : null;
+        }
+    }
+
+    public static class IntegrationServiceExtensions
+    {
+        /// <summary>Adds an action integrations can run.</summary>
+        public static IServiceCollection AddIntegrationAction<T>(this IServiceCollection services)
+            where T : class, IIntegrationAction
+        {
+            services.TryAddSingleton<T>();
+            services.AddSingleton<IIntegrationAction>(provider => provider.GetRequiredService<T>());
+            return services;
         }
     }
 }

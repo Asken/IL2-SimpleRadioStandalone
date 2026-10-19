@@ -6,10 +6,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Admin;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Microsoft.Extensions.Hosting;
 using NLog;
 
@@ -36,7 +35,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         private readonly IntegrationStore _store;
         private readonly AuditRetention _retention;
-        private readonly ServerIdentity _identity;
+        private readonly IEventTypeRegistry _eventTypes;
+        private readonly IServerInfo _identity;
         private readonly Dictionary<string, IIntegrationAction> _actions;
         private readonly Channel<SrsEvent> _incoming = Channel.CreateBounded<SrsEvent>(
             new BoundedChannelOptions(10_000) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
@@ -47,10 +47,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         private volatile IReadOnlyList<IntegrationDefinition> _integrations;
         private int _droppedEvents;
 
-        public IntegrationDispatcher(IntegrationStore store, ServerEvents events, IEnumerable<IIntegrationAction> actions,
-            AuditRetention retention, ServerIdentity identity = null)
+        public IntegrationDispatcher(IntegrationStore store, IEventBus events, IEnumerable<IIntegrationAction> actions,
+            IEventTypeRegistry eventTypes, AuditRetention retention, IServerInfo identity = null)
         {
             _store = store;
+            _eventTypes = eventTypes;
             _retention = retention;
             _identity = identity;
             _actions = actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
@@ -131,7 +132,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                     continue;
                 }
 
-                data ??= EventData.From(srsEvent, _identity?.Section());
+                data ??= EventData.From(srsEvent, EventData.ServerSection(_identity));
                 if (EventData.Matches(data.Value, integration.Conditions))
                 {
                     _store.Enqueue(integration, srsEvent.Type, srsEvent.Message, data.Value);
@@ -274,7 +275,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 ExecutionId = execution.Id,
                 Integration = integration,
                 Config = integration.ActionConfig,
-                EventType = SrsEventTypes.Find(execution.EventType),
+                EventType = _eventTypes.Find(execution.EventType),
                 Data = data.RootElement,
                 Attempt = attempt,
                 State = _store.State(integration.Id)

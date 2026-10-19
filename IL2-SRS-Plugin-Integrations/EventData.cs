@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {
@@ -18,7 +19,37 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
     public static class EventData
     {
-        /// <param name="server">The server's identity (<see cref="Admin.ServerIdentity.Section"/>), added to <c>server.*</c>.</param>
+        /// <summary>Fields every event has in addition to its payload, for conditions and templates.</summary>
+        public static readonly IReadOnlyList<SrsEventField> CommonFields = new SrsEventField[]
+        {
+            new("event.type", "string", "Event type, e.g. client.connected"),
+            new("event.label", "string", "Event name, e.g. Client connected"),
+            new("event.category", "string", "server, client, radio, admin or auth"),
+            new("event.actor", "string", "Who caused it: system, admin, api:<key name> or anonymous", "system"),
+            new("event.message", "string", "The event log message"),
+            new("event.occurredAt", "string", "When it happened (UTC, ISO 8601)", "2026-10-12T18:00:00.0000000Z"),
+            new("server.name", "string", "Server Name setting, or the host name when it isn't set", "My SRS Server"),
+            new("server.hostname", "string",
+                "Host name; in Docker the container ID unless the stack sets hostname", "srs-1"),
+            new("server.version", "string", "Server version, e.g. the image version", "1.0.5.0-preview"),
+            new("server.adminUrl", "string", "Public Admin URL setting, when set", "https://srs.example.com")
+        };
+
+        /// <summary>The server's identity fields of the <c>server</c> section, or null without one.</summary>
+        public static JsonObject ServerSection(IServerInfo server)
+        {
+            return server == null
+                ? null
+                : new JsonObject
+                {
+                    ["name"] = server.Name,
+                    ["hostname"] = server.Hostname,
+                    ["version"] = server.Version,
+                    ["adminUrl"] = server.AdminUrl
+                };
+        }
+
+        /// <param name="server">The server's identity (<see cref="ServerSection"/>), added to <c>server.*</c>.</param>
         public static JsonElement From(SrsEvent srsEvent, JsonObject server = null)
         {
             var data = JsonNode.Parse(srsEvent.Payload.GetRawText()) as JsonObject ?? new JsonObject();
@@ -78,7 +109,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>Every field path an integration on this event can use: <c>event.*</c> and the payload fields.</summary>
         public static IEnumerable<SrsEventField> Fields(SrsEventType type)
         {
-            return SrsEventTypes.CommonFields.Concat(type?.Fields ?? Array.Empty<SrsEventField>());
+            return CommonFields.Concat(type?.Fields ?? Array.Empty<SrsEventField>());
         }
 
         /// <summary>
@@ -87,7 +118,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// </summary>
         public static IReadOnlyList<EventFieldUse> Fields(IReadOnlyList<SrsEventType> types)
         {
-            var fields = SrsEventTypes.CommonFields
+            var fields = CommonFields
                 .Select(f => (Field: f, In: types.ToList()))
                 .ToList();
             foreach (var type in types)

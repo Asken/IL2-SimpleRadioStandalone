@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
 using Microsoft.Data.Sqlite;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
@@ -18,6 +19,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         public string File(string name) => System.IO.Path.Combine(Path, name);
 
         public SrsDatabase CreateDatabase() => new SrsDatabase(File(SrsDatabase.FileName));
+
+        public IntegrationDatabase CreateIntegrationDatabase() => new IntegrationDatabase(File(IntegrationDatabase.FileName));
 
         public void Dispose()
         {

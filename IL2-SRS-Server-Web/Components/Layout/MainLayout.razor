@@ -32,13 +32,12 @@
         <NavLink href="channels">Channel Names</NavLink>
         <NavLink href="bans">Bans</NavLink>
         <NavLink href="events">Event Log</NavLink>
-        <NavLink href="integrations">Integrations</NavLink>
-        <NavLink href="integration-runs">Integration Runs</NavLink>
         <NavLink href="api-keys">API Keys</NavLink>
         @foreach (var item in ExtraNavItems)
         {
             <NavLink href="@item.Href">@item.Label</NavLink>
         }
+        <NavLink href="plugins">Plugins</NavLink>
     </nav>
 
     <main class="content">

@@ -5,12 +5,13 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
+namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 {
     public sealed record ConditionDto(string Field, string Operator, string Value);
 
@@ -40,7 +41,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
     /// <summary>Integrations under /api/v1/integrations; changes need the write scope.</summary>
     internal static class IntegrationEndpoints
     {
-        public static void Map(RouteGroupBuilder api)
+        public static void Map(IEndpointRouteBuilder api)
         {
             api.MapGet("/integrations", (IntegrationService service) => service.Store.List().Select(ToResponse))
                 .WithSummary("Integrations (secret settings are never returned)");
@@ -150,7 +151,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Api
         private static IResult NotFound(long id) => Results.NotFound(new ErrorResponse($"No integration with id {id}."));
 
         private static RouteHandlerBuilder Write(RouteHandlerBuilder builder) =>
-            builder.RequireAuthorization(ApiKeyAuthenticationHandler.WritePolicy);
+            builder.RequireAuthorization(ServerApi.WritePolicy);
 
         private static string Actor(ClaimsPrincipal user) => user.Identity?.Name ?? "api";
     }
