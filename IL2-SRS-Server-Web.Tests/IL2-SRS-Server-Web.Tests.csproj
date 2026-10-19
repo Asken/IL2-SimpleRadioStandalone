@@ -15,8 +15,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IL2-SRS-Server-Web\IL2-SRS-Server-Web.csproj" />
-    <!-- Compiled in, as a host would; the plugin-loading tests load it from its build output folder too. -->
-    <ProjectReference Include="..\IL2-SRS-Plugin-Integrations\IL2-SRS-Plugin-Integrations.csproj" />
+    <!-- Installed from a plugin folder by the plugin-loading tests. -->
+    <ProjectReference Include="..\IL2-SRS-Plugin-Sample\IL2-SRS-Plugin-Sample.csproj" />
   </ItemGroup>
 
 </Project>

@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="IL2-SRS-Server-Web.Tests" />
+    <InternalsVisibleTo Include="IL2-SRS-Plugin-Integrations.Tests" />
   </ItemGroup>
 
   <ItemGroup>

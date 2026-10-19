@@ -16,7 +16,7 @@ using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Microsoft.AspNetCore.DataProtection;
 using Xunit;
 
-namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
+namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
 {
     /// <summary>An action that records what it was asked to do and answers with a scripted result.</summary>
     internal sealed class RecordingAction : IIntegrationAction
