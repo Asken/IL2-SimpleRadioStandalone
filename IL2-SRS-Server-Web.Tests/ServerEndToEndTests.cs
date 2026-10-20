@@ -71,6 +71,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public void CreatesThePluginsFolderInTheDataDirectory()
+        {
+            Assert.True(Directory.Exists(Path.Combine(_data.Path, ServerPlugins.FolderName)));
+        }
+
+        [Fact]
         public async Task LoginShowsPasswordErrorsOnTheField()
         {
             var token = TestContext.Current.CancellationToken;

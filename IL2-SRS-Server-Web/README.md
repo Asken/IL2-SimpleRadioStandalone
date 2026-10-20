@@ -18,7 +18,7 @@ What it adds over the WPF server:
 - Live event log of logins, admin actions, server start/stop, client connections, name and coalition changes and
   radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
 - Plugins add pages, API endpoints and event handling without changing the server. See [Plugins](#plugins).
-- Integrations (a plugin, included in the image): run an action when an event happens, optionally only when the
+- Integrations (a plugin, included in the image and the Windows build): run an action when an event happens, optionally only when the
   event data matches conditions (for example only Red pilots). Runs are queued, kept across restarts, retried if
   configured and listed under **Runs** on the Integrations page. Built-in actions: **Post to Discord** (webhook, plain message or
   card) and **Send an HTTP request** (any URL, e.g. Slack or Teams webhooks). See [Integrations](#integrations).
@@ -39,7 +39,7 @@ instead. The first log line shows which folder is in use.
 | `srs-server.json` | Optional configuration file with the same `SRS_*` keys as the environment |
 | `serverlog.txt` | Full server log (also written to the console) |
 | `keys/` | Keys that protect the admin login cookie and encrypt integration secrets (back it up with `srs.db`) |
-| `plugins/` | Plugins to load, one folder each (see [Plugins](#plugins)) |
+| `plugins/` | Plugins to load, one folder each (see [Plugins](#plugins)); created on start |
 | `plugin-data/<id>/` | Each plugin's own data, e.g. `plugin-data/integrations/integrations.db` |
 | `clients-list.json` | Client export, when **Auto Export List** is on |
 
@@ -128,6 +128,9 @@ Publish a self-contained build (no .NET installation needed on the server):
 dotnet publish IL2-SRS-Server-Web -c Release -r win-x64 --self-contained -o C:\IL2-SRS\app
 ```
 
+Publishing the server also publishes the integrations plugin into `plugins\IL2-SRS-Plugin-Integrations`; add
+`-p:PublishBundledPlugins=false` to leave it out.
+
 Run it in a console (without `--data-dir`, see [Data directory](#data-directory)):
 
 ```powershell
@@ -202,7 +205,8 @@ curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/client
 
 ## Integrations
 
-Integrations are a plugin ([`IL2-SRS-Plugin-Integrations`](../IL2-SRS-Plugin-Integrations)), included in the image.
+Integrations are a plugin ([`IL2-SRS-Plugin-Integrations`](../Plugins/IL2-SRS-Plugin-Integrations)), included in the image and the
+Windows build.
 Servers from before the plugin kept integrations in `srs.db`; the plugin moves them to its own database when it
 first starts. An integration runs an action when one of its trigger events happens: add one or more events (for example
 **Server started** and **Server stopped**), optional conditions on the event data, and the action. **Test** runs it
@@ -245,7 +249,8 @@ Templates run sandboxed: no includes, loops and recursion are limited and a temp
 ## Plugins
 
 A plugin is a folder `plugins/<name>/` with `<name>.dll` and the plugin's own dependencies. The server loads plugin
-folders from its install folder (the image's integrations plugin is in `/app/plugins`), from `plugins/` in the data
+folders from `plugins/` in its install folder (where publishing puts the integrations plugin, e.g. `/app/plugins` in
+the image), from `plugins/` in the data
 directory, and from the folders in `SRS_PLUGIN_PATHS` (separated by `;`). To install one, copy its folder there and
 restart the server; the **Plugins** page and `GET /api/v1/plugins` show what loaded, and why a plugin didn't.
 Plugins run inside the server with its permissions: only install plugins you trust.
@@ -281,7 +286,7 @@ return. Plugins are built against the SDK's major version; the server refuses pl
 A host can also compile plugins in: reference this project and call `Program.Run(args, builder =>
 builder.AddServerPlugin(new MyPlugin()))` from its own `Main`.
 
-[`IL2-SRS-Plugin-Sample`](../IL2-SRS-Plugin-Sample) is a complete minimal plugin (a page, a stylesheet, an event
+[`IL2-SRS-Plugin-Sample`](../Plugins/IL2-SRS-Plugin-Sample) is a complete minimal plugin (a page, a stylesheet, an event
 type and an API endpoint); the server's tests install it from a plugin folder.
 
 ## Development
@@ -290,8 +295,8 @@ Requires the .NET 10 SDK.
 
 ```sh
 dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWORD=dev-password
-dotnet test --project IL2-SRS-Server-Web.Tests            # the server, without plugins
-dotnet test --project IL2-SRS-Plugin-Integrations.Tests    # the integrations plugin, hosted by the server
+dotnet test --project IL2-SRS-Server-Web.Tests                    # the server, without plugins
+dotnet test --project Plugins/IL2-SRS-Plugin-Integrations.Tests    # the integrations plugin, hosted by the server
 ```
 
 [`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload

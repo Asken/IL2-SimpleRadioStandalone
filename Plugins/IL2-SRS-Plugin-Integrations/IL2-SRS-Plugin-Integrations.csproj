@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <!-- The server provides the SDK (and SQLite); don't ship copies with the plugin. -->
-    <ProjectReference Include="..\IL2-SRS-Server-Abstractions\IL2-SRS-Server-Abstractions.csproj"
+    <ProjectReference Include="..\..\IL2-SRS-Server-Abstractions\IL2-SRS-Server-Abstractions.csproj"
                       Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
 

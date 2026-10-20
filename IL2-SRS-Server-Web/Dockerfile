@@ -8,15 +8,13 @@ WORKDIR /src
 # (_framework/blazor.web.js) when it sees the .razor files at restore time.
 COPY IL2-SRS-Server-Abstractions/ IL2-SRS-Server-Abstractions/
 COPY IL2-SRS-Server-Web/ IL2-SRS-Server-Web/
-COPY IL2-SRS-Plugin-Integrations/ IL2-SRS-Plugin-Integrations/
+COPY Plugins/IL2-SRS-Plugin-Integrations/ Plugins/IL2-SRS-Plugin-Integrations/
 RUN dotnet restore IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj \
-    && dotnet restore IL2-SRS-Plugin-Integrations/IL2-SRS-Plugin-Integrations.csproj
+    && dotnet restore Plugins/IL2-SRS-Plugin-Integrations/IL2-SRS-Plugin-Integrations.csproj
 
 COPY IL2-SR-Common/ IL2-SR-Common/
-# The integrations plugin ships in the image's plugins folder; admins add others under /data/plugins.
+# Publishing the server also publishes the integrations plugin into /app/plugins; admins add others under /data/plugins.
 RUN dotnet publish IL2-SRS-Server-Web/IL2-SRS-Server-Web.csproj -c Release -o /app --no-restore \
-    && dotnet publish IL2-SRS-Plugin-Integrations/IL2-SRS-Plugin-Integrations.csproj -c Release --no-restore \
-        -o /app/plugins/IL2-SRS-Plugin-Integrations \
     && rm -f /app/Install-WindowsService.ps1 /app/web.config \
     && mkdir -p /data
 

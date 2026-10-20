@@ -21,12 +21,14 @@ The web server is new. The Windows server window remains available while the web
 - **Clients**: search, mute, kick, and ban with a reason and optional duration.
 - **Settings** and **Channel Names**, applied immediately and sent to connected clients. Channel names can be shared, or set separately for Allies and Axis.
 - **Bans** with reason, who banned, and expiry. Ban an IP address directly or remove a ban.
-- **Event log** of logins, admin actions, server start and stop, client connections and refused connections. Old events are removed automatically.
+- **Event log** of logins, admin actions, server start and stop, client connections and refused connections, name and coalition changes and radio retuning. It updates live; filter it by category, type or client, and click an event to see its details. Old events are removed automatically.
+- **Integrations** that post to Discord or call a web address when something happens on the server, for example a pilot joining or the server starting. See [Integrations](#integrations).
 - **API keys** for the REST API, with read-only or read-write access, and an interactive **API reference**.
+- **Plugins** that add pages, API endpoints and event handling. See [Plugins](#plugins).
 
-Times are shown in your own time zone. The **Desktop / Light / Dark** button in the top bar switches the theme; **Desktop** follows your system setting. The choice is remembered in each browser.
+Times are shown in your own time zone. The **Desktop / Light / Dark / IL-2 SRS** button in the top bar switches the theme; **Desktop** follows your system setting. The choice is remembered in each browser. On a phone, the menu is a dropdown at the top of the page.
 
-Settings, bans, the event log and API keys are stored in `srs.db`, a SQLite database in the server's data folder.
+Settings, bans, the event log and API keys are stored in `srs.db`, a SQLite database in the server's data folder. Plugins keep their own data under `plugin-data` in the same folder.
 
 ## Run in Docker
 
@@ -54,6 +56,8 @@ The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a rever
    ```powershell
    dotnet publish IL2-SRS-Server-Web -c Release -r win-x64 --self-contained -o C:\IL2-SRS\app
    ```
+
+   The build includes the Integrations plugin, in `plugins\IL2-SRS-Plugin-Integrations`.
 
    Windows marks files extracted from a downloaded ZIP as coming from the internet. If PowerShell refuses to run the install script, unblock the folder first:
 
@@ -100,9 +104,28 @@ Create a key under **API Keys** in the admin UI and send it as `Authorization: B
 curl -H "Authorization: Bearer $SRS_API_KEY" http://localhost:8080/api/v1/clients
 ```
 
-Read keys can view status, clients, settings, channel names, bans and events. Write keys can also change settings, kick, ban and mute clients, manage bans, clear the event log, and start, stop or restart the server. Every change made with a key is recorded in the event log under the key's name.
+Read keys can view status, clients, settings, channel names, bans, events, plugins and integrations. Write keys can also change settings, kick, ban and mute clients, manage bans and integrations, clear the event log, and start, stop or restart the server. Every change made with a key is recorded in the event log under the key's name.
+
+Each event has a type, such as `client.connected`, and details as JSON. `GET /api/v1/events` filters by type and client, and `GET /api/v1/event-types` lists the types and their fields.
 
 The **API reference** button on the API Keys page opens an interactive reference (`/scalar`) where you can paste a key and try requests from the browser. Scripts and code generators can use the OpenAPI document at `/openapi/v1.json`.
+
+## Integrations
+
+An integration runs an action when one of its events happens, for example **Server started** or **Client connected**. Add conditions to narrow it down, for example only pilots on the Red side. The built-in actions are:
+
+- **Post to Discord** through a channel webhook, as a plain message or a card. It can post a new message for each event, or keep updating one message, for example a server status pinned in the channel.
+- **Send an HTTP request** to any web address, for example a Slack or Teams webhook or your own bot.
+
+Messages are templates filled in from the event, such as `{{ client.name }} joined {{ client.coalitionName }}`, with a live preview on the integration page. **Test** runs the integration once with example data.
+
+Runs are queued, kept across restarts and retried if the integration allows it; **Runs** on the Integrations page lists them. Webhook addresses and headers are stored encrypted with the keys in the `keys` folder and are never shown again, so back up `keys` together with the data.
+
+## Plugins
+
+Integrations are a plugin, included in the Docker image and the Windows build. The **Plugins** page shows the plugins the server runs, and why a plugin did not load.
+
+To add a plugin, copy its folder into `plugins` in the data folder and restart the server. Plugins run inside the server with its permissions, so only install plugins you trust. For writing your own, see [Plugins in the web server README](https://github.com/riaanjutte/IL2-SimpleRadioStandalone/blob/master/IL2-SRS-Server-Web/README.md#plugins).
 
 ## Differences from the server window
 

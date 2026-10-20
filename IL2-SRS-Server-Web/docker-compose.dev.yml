@@ -29,7 +29,7 @@ services:
       - -c
       - >-
         socat TCP-LISTEN:8083,fork,reuseaddr TCP:127.0.0.1:8082 &
-        dotnet build ../IL2-SRS-Plugin-Integrations -o /plugins-dev/IL2-SRS-Plugin-Integrations &&
+        dotnet build ../Plugins/IL2-SRS-Plugin-Integrations -o /plugins-dev/IL2-SRS-Plugin-Integrations &&
         exec dotnet watch run --non-interactive --no-launch-profile
     environment:
       SRS_ADMIN_PASSWORD: ${SRS_ADMIN_PASSWORD:?Set SRS_ADMIN_PASSWORD (at least 8 characters)}
@@ -58,8 +58,8 @@ services:
       - dev-obj:/src/IL2-SRS-Server-Web/obj
       - dev-sdk-bin:/src/IL2-SRS-Server-Abstractions/bin
       - dev-sdk-obj:/src/IL2-SRS-Server-Abstractions/obj
-      - dev-plugin-bin:/src/IL2-SRS-Plugin-Integrations/bin
-      - dev-plugin-obj:/src/IL2-SRS-Plugin-Integrations/obj
+      - dev-plugin-bin:/src/Plugins/IL2-SRS-Plugin-Integrations/bin
+      - dev-plugin-obj:/src/Plugins/IL2-SRS-Plugin-Integrations/obj
       - dev-nuget:/root/.nuget/packages
       - il2-srs-data:/data
 
