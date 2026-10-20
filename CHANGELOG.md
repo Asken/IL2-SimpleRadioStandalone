@@ -16,6 +16,7 @@
 ### Fixed
 
 - The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
+- PTT no longer lags when a device with a keybind on it disappears, for example a joystick taken over by Thrustmaster T.A.R.G.E.T. While the device was missing, SRS read the name and product ID of every input device from DirectInput on every PTT check, which slowed checks to about one a second for every keybind, including the keyboard. It now reads each device once. The "PTT input polling took" warning in the log also names the keybinds whose device is missing.
 
 ## IL2-SRS 1.0.5.0-beta.2
 

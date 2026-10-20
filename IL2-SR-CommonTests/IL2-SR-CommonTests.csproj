@@ -80,6 +80,7 @@
     <Compile Include="DCSState\PlayerGameStateTests.cs" />
     <Compile Include="Helpers\AirfieldCodeLookupTests.cs" />
     <Compile Include="Helpers\ConversionHelpersTests.cs" />
+    <Compile Include="Input\DeviceIdentityCacheTests.cs" />
     <Compile Include="Input\InputBindingLayoutTests.cs" />
     <Compile Include="Input\InputPollingCycleCacheTests.cs" />
     <Compile Include="Installer\Il2InstallDiscoveryTests.cs" />
