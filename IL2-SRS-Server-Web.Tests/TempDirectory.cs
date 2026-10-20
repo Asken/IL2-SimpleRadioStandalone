@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
-using Microsoft.Data.Sqlite;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 {
@@ -21,7 +20,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
 
         public void Dispose()
         {
-            SqliteConnection.ClearAllPools();
+            // Close pooled connections to this folder's databases so they can be deleted. Not ClearAllPools:
+            // tests run in parallel, and clearing every pool can close a connection another test is using.
+            foreach (var database in Directory.EnumerateFiles(Path, "*.db", SearchOption.AllDirectories))
+            {
+                SrsDatabase.ClearPool(database);
+            }
+
             try
             {
                 Directory.Delete(Path, true);
