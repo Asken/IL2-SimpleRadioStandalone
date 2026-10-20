@@ -46,7 +46,7 @@ This publishes the SRS port `6002` for TCP and UDP, keeps the admin UI on `http:
 `docker ps` shows the container as `healthy` while both SRS listeners are running. It turns `unhealthy` if a listener fails, or while an admin has stopped the server from the dashboard.
 
 :::caution[Protect the admin UI]
-The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a reverse proxy with HTTPS (Caddy, Traefik, nginx) in front of it before exposing it to the internet.
+The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a reverse proxy with HTTPS (Caddy, Traefik, nginx) in front of it before exposing it to the internet. Then set `SRS_TRUSTED_PROXIES` to the proxy's address or network, so failed logins are limited and logged per browser and the login cookie is marked secure.
 :::
 
 ## Run as a Windows service
@@ -92,6 +92,7 @@ Set these as environment variables, as `--KEY=value` arguments, or in `srs-serve
 | `SRS_<SETTING>` | Fix any [server setting](../configuration-reference/), for example `SRS_SERVER_PORT=6002`. Fixed settings are shown as locked in the admin UI. |
 | `SRS_EVENT_RETENTION_DAYS` | Keep events for this many days (default 30). |
 | `SRS_EVENT_MAX_ROWS` | Keep at most this many events (default 100000). |
+| `SRS_TRUSTED_PROXIES` | Your reverse proxy's address or network, for example `172.18.0.0/16`. Separate several with `,`. |
 | `urls` | Admin UI address. Defaults to `http://localhost:8080` on Windows and port 8080 on all interfaces in Docker. |
 
 Run several servers by giving each its own data folder and SRS port, and on Windows its own service name and admin UI address.

@@ -102,6 +102,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins
                 return builder;
             }
 
+            // A plugin that fails partway leaves nothing behind (e.g. a hosted service that would start anyway).
+            var servicesBefore = builder.Services.ToList();
             try
             {
                 var dataDirectory = Path.Combine(ServerPaths.DataDirectory, DataFolderName, plugin.Id);
@@ -112,6 +114,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins
             }
             catch (Exception ex)
             {
+                builder.Services.Clear();
+                foreach (var service in servicesBefore)
+                {
+                    builder.Services.Add(service);
+                }
+
                 Fail(catalog, source, "Setting up the plugin failed: " + ex.Message);
                 return builder;
             }
