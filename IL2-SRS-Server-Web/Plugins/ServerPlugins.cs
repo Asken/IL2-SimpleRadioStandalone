@@ -54,10 +54,12 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Plugins
         /// <summary>Loads the plugins in the plugin folders.</summary>
         internal static void LoadFromFolders(WebApplicationBuilder builder)
         {
+            // Created up front so admins see where to put plugins.
+            var dataPlugins = Directory.CreateDirectory(Path.Combine(ServerPaths.DataDirectory, FolderName)).FullName;
             var roots = new List<string>
             {
                 Path.Combine(AppContext.BaseDirectory, FolderName),
-                Path.Combine(ServerPaths.DataDirectory, FolderName)
+                dataPlugins
             };
             roots.AddRange((builder.Configuration[PathsKey] ?? string.Empty)
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

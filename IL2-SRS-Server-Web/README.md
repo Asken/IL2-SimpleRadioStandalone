@@ -39,7 +39,7 @@ instead. The first log line shows which folder is in use.
 | `srs-server.json` | Optional configuration file with the same `SRS_*` keys as the environment |
 | `serverlog.txt` | Full server log (also written to the console) |
 | `keys/` | Keys that protect the admin login cookie and encrypt integration secrets (back it up with `srs.db`) |
-| `plugins/` | Plugins to load, one folder each (see [Plugins](#plugins)) |
+| `plugins/` | Plugins to load, one folder each (see [Plugins](#plugins)); created on start |
 | `plugin-data/<id>/` | Each plugin's own data, e.g. `plugin-data/integrations/integrations.db` |
 | `clients-list.json` | Client export, when **Auto Export List** is on |
 

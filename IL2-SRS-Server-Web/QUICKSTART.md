@@ -14,7 +14,6 @@ Open http://localhost:8080.
 Add a plugin:
 
 ```sh
-docker exec il2-srs-server mkdir -p /data/plugins
 docker cp ./MyPlugin il2-srs-server:/data/plugins/MyPlugin
 docker restart il2-srs-server
 ```
@@ -36,7 +35,6 @@ Open http://localhost:8080.
 Add a plugin:
 
 ```powershell
-New-Item -ItemType Directory -Force C:\IL2-SRS\main\plugins
 Copy-Item .\MyPlugin C:\IL2-SRS\main\plugins\MyPlugin -Recurse
 Restart-Service IL2-SRS-Server
 ```
