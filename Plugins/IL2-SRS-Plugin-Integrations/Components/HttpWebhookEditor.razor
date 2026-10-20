@@ -48,6 +48,14 @@
               @onblur="() => Touch(HttpWebhookAction.HeadersField)"></textarea>
     <FieldError Id="@ErrorId(HttpWebhookAction.HeadersField)" Message="@ErrorFor(HttpWebhookAction.HeadersField)" />
     <span class="field-help">Optional, one <code>Name: value</code> per line. Stored encrypted.</span>
+    @if (HasStoredSecret(HttpWebhookAction.HeadersField))
+    {
+        <label class="secret-clear">
+            <input type="checkbox" checked="@Config.ClearsSecret(HttpWebhookAction.HeadersField)"
+                   @onchange="e => SetSecretCleared(HttpWebhookAction.HeadersField, (bool)e.Value)" />
+            <span>Remove the stored headers when saving</span>
+        </label>
+    }
 </div>
 
 <div class="field">

@@ -34,7 +34,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         {
             _database = database;
             _secrets = secrets;
-            _actions = actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
+            _actions = IntegrationActions.ByType(actions);
         }
 
         /// <summary>An integration was created, changed or deleted.</summary>
@@ -206,8 +206,11 @@ ORDER BY id LIMIT $limit;";
         /// <summary>
         /// Only an integration's oldest queued or running run may start, so runs go out in event order: a newer
         /// run waits while an older one waits for a retry, e.g. a "started" status is never sent after "stopped".
+        /// The index holds only pending runs; without it SQLite picks the one on integration_id and reads the
+        /// integration's whole history for every check.
         /// </summary>
         private const string IsOldestPending = @"id = (SELECT MIN(pending.id) FROM integration_executions pending
+    INDEXED BY ix_integration_executions_pending
     WHERE pending.integration_id = integration_executions.integration_id AND pending.status IN ('queued', 'running'))";
 
         /// <summary>When the next run that can start is due, or null if there is none.</summary>
@@ -290,8 +293,9 @@ WHERE id = $id;";
             using (var connection = _database.Open())
             using (var command = connection.CreateCommand())
             {
-                command.CommandText = @"UPDATE integration_executions SET status = 'queued', next_attempt_at = $now,
-    finished_at = NULL
+                // From attempt 1 again, so it gets the integration's retries.
+                command.CommandText = @"UPDATE integration_executions SET status = 'queued', attempts = 0,
+    next_attempt_at = $now, finished_at = NULL
 WHERE id = $id AND status IN ('failed', 'skipped', 'succeeded');";
                 command.Parameters.AddWithValue("$id", executionId);
                 command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
@@ -396,7 +400,8 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                 {
                     config[field] = _secrets.Protect(value);
                 }
-                else if (keepStored && existing.Value.Config.TryGetPropertyValue(field, out var stored) && stored != null)
+                else if (keepStored && !config.ClearsSecret(field) &&
+                         existing.Value.Config.TryGetPropertyValue(field, out var stored) && stored != null)
                 {
                     config[field] = stored.DeepClone();
                 }
@@ -406,6 +411,7 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                 }
             }
 
+            config.Remove(ActionConfigExtensions.ClearSecretsField);
             return config;
         }
 
@@ -436,6 +442,7 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
             {
                 var config = ParseObject(reader.GetString(7));
                 var hints = new Dictionary<string, string>(StringComparer.Ordinal);
+                var unreadable = new List<string>();
 
                 // Secrets are recognised by their stored form, so they stay hidden even if the action is gone.
                 foreach (var property in config.ToList())
@@ -446,6 +453,10 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                         var secret = _secrets.Unprotect(text);
                         hints[property.Key] = SecretProtector.Hint(secret);
                         config[property.Key] = decrypt ? secret : null;
+                        if (secret == null)
+                        {
+                            unreadable.Add(property.Key);
+                        }
                     }
                 }
 
@@ -461,6 +472,7 @@ DELETE FROM integration_executions WHERE status IN ('succeeded', 'failed', 'skip
                     ActionType = reader.GetString(6),
                     ActionConfig = config,
                     SecretHints = hints,
+                    UnreadableSecrets = unreadable,
                     RetryMode = Enum.TryParse<RetryMode>(reader.GetString(8), true, out var mode) ? mode : RetryMode.None,
                     MaxRetries = (int)reader.GetInt64(9),
                     CreatedAtUtc = SqliteDatabase.ParseTimestamp(reader.GetString(10)),

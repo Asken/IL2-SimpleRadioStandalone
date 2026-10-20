@@ -151,6 +151,62 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
         }
 
         [Fact]
+        public void ClearsAStoredSecretWhenAsked()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "first-secret-value" }));
+
+            var cleared = store.Save(Integration(new JsonObject
+            {
+                ["token"] = null,
+                [ActionConfigExtensions.ClearSecretsField] = new JsonArray("token")
+            }, saved.Id));
+
+            Assert.Empty(cleared.SecretHints);
+            var config = store.GetForExecution(saved.Id).ActionConfig;
+            Assert.False(config.ContainsKey("token"));
+            Assert.False(config.ContainsKey(ActionConfigExtensions.ClearSecretsField));
+        }
+
+        [Fact]
+        public void RunAgainStartsFromTheFirstAttempt()
+        {
+            using var temp = new TempDirectory();
+            var (store, _) = CreateStore(temp);
+            var saved = store.Save(Integration(new JsonObject { ["token"] = "secret-value-1234" }));
+            var id = store.Enqueue(saved, "client.connected", "connected", EventData.Sample(SrsEventTypes.ClientConnected));
+            Assert.True(store.TryStart(id));
+            store.Finish(id, ExecutionStatus.Failed, "Bad gateway", null, null);
+
+            Assert.True(store.Requeue(id));
+
+            var run = store.GetExecution(id);
+            Assert.Equal(ExecutionStatus.Queued, run.Status);
+            Assert.Equal(0, run.Attempts);
+        }
+
+        [Fact]
+        public void FindsPendingRunsWithTheirIndex()
+        {
+            using var temp = new TempDirectory();
+            var database = temp.CreateIntegrationDatabase();
+            using var connection = database.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"EXPLAIN QUERY PLAN SELECT MIN(pending.id) FROM integration_executions pending
+INDEXED BY ix_integration_executions_pending
+WHERE pending.integration_id = 1 AND pending.status IN ('queued', 'running');";
+            using var reader = command.ExecuteReader();
+            var plan = new List<string>();
+            while (reader.Read())
+            {
+                plan.Add(reader.GetString(3));
+            }
+
+            Assert.Contains(plan, step => step.Contains("ix_integration_executions_pending", StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void DeletingAnIntegrationSkipsItsQueuedRunsAndKeepsHistory()
         {
             using var temp = new TempDirectory();
@@ -544,6 +600,90 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
             var skipped = await RunNext(service, dispatcher);
             Assert.Equal(ExecutionStatus.Skipped, skipped.Status);
             Assert.Equal(2, action.Runs.Count);
+        }
+
+        [Fact]
+        public async Task AnUnexpectedErrorFailsTheRunWithoutHoldingBackLaterOnes()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                service.EventTypes, new AuditRetention());
+            Save(service, "Joins");
+            dispatcher.Match(Connected());
+            dispatcher.Match(Connected());
+            var broken = service.Store.QueryExecutions().Min(r => r.Id);
+            using (var connection = temp.CreateIntegrationDatabase().Open())
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "UPDATE integration_executions SET data = 'not json' WHERE id = $id;";
+                command.Parameters.AddWithValue("$id", broken);
+                command.ExecuteNonQuery();
+            }
+
+            // Two passes, as the dispatcher's loop makes when the finished run wakes it.
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await dispatcher.SendDueRunsAsync(deadline.Token);
+            await dispatcher.SendDueRunsAsync(deadline.Token);
+
+            var runs = service.Store.QueryExecutions().OrderBy(r => r.Id).ToList();
+            Assert.Equal(ExecutionStatus.Failed, runs[0].Status);
+            Assert.StartsWith("Failed unexpectedly:", runs[0].LastError);
+            Assert.Equal(ExecutionStatus.Succeeded, runs[1].Status);
+        }
+
+        [Fact]
+        public void MatchesAnIntegrationSavedAfterTheListWasRead()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var dispatcher = new IntegrationDispatcher(service.Store, events, new IIntegrationAction[] { action },
+                service.EventTypes, new AuditRetention());
+            Save(service, "First");
+            dispatcher.Match(Connected());
+
+            Save(service, "Second");
+            dispatcher.Match(Connected());
+
+            Assert.Equal(new[] { "First", "First", "Second" },
+                service.Store.QueryExecutions().Select(r => r.IntegrationName).OrderBy(n => n));
+        }
+
+        [Fact]
+        public async Task FailsARunWhoseStoredSecretCantBeRead()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var integration = Save(service, "Joins", retryMode: RetryMode.Fixed, maxRetries: 3);
+            // As after the keys folder was replaced: the same database, read with other keys.
+            var otherKeys = new IntegrationStore(temp.CreateIntegrationDatabase(),
+                new SecretProtector(new EphemeralDataProtectionProvider()), new IIntegrationAction[] { action });
+            var dispatcher = new IntegrationDispatcher(otherKeys, events, new IIntegrationAction[] { action },
+                service.EventTypes, new AuditRetention());
+            otherKeys.Enqueue(integration, "client.connected", null, EventData.Sample(SrsEventTypes.ClientConnected));
+
+            var due = otherKeys.Due(DateTime.UtcNow, 1).Single();
+            Assert.True(otherKeys.TryStart(due.Id));
+            await dispatcher.RunAsync(due, CancellationToken.None);
+
+            var run = otherKeys.GetExecution(due.Id);
+            Assert.Equal(ExecutionStatus.Failed, run.Status);
+            Assert.Equal("The stored token can't be read; enter it again on the integration page.", run.LastError);
+            Assert.Empty(action.Runs);
+        }
+
+        [Fact]
+        public void IgnoresASecondActionWithATypeAlreadyTaken()
+        {
+            using var temp = new TempDirectory();
+            var (service, events, action) = IntegrationServiceTests.Create(temp);
+            var actions = new IIntegrationAction[] { action, new RecordingAction() };
+
+            var dispatcher = new IntegrationDispatcher(service.Store, events, actions, service.EventTypes, new AuditRetention());
+            var withBoth = new IntegrationService(service.Store, events, actions, service.EventTypes);
+
+            Assert.NotNull(dispatcher);
+            Assert.Same(action, Assert.Single(withBoth.Actions));
         }
 
         [Fact]

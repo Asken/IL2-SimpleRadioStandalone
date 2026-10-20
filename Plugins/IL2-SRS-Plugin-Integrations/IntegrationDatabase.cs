@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS integration_state (
     updated_at     TEXT NOT NULL,
     PRIMARY KEY (integration_id, key)
 )"
+            },
+            // 3: finds an integration's oldest pending run without reading its finished ones.
+            new[]
+            {
+                @"CREATE INDEX IF NOT EXISTS ix_integration_executions_pending ON integration_executions (integration_id, id)
+    WHERE status IN ('queued', 'running')"
             }
         };
 

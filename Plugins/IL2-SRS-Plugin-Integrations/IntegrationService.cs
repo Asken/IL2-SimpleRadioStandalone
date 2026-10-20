@@ -65,8 +65,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             _events = events;
             EventTypes = eventTypes;
             _identity = identity;
-            Actions = actions.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase).ToList();
-            _actions = Actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
+            _actions = IntegrationActions.ByType(actions);
+            Actions = _actions.Values.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         public IntegrationStore Store { get; }
@@ -217,6 +217,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
 
             var integration = Store.Get(id);
+            if (integration == null)
+            {
+                return false; // Deleted at the same moment.
+            }
+
             Publish(IntegrationEventTypes.IntegrationUpdated, actor,
                 $"{(enabled ? "Enabled" : "Disabled")} integration \"{integration.Name}\"", integration);
             return true;
@@ -291,10 +296,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
         }
 
-        /// <summary>The draft's settings, with secrets left empty filled in from the stored integration.</summary>
+        /// <summary>
+        /// The draft's settings as they will be saved: secrets left empty filled in from the stored integration,
+        /// unless they are to be cleared or can't be read.
+        /// </summary>
         private JsonObject WithStoredSecrets(IntegrationDefinition draft)
         {
             var config = (JsonObject)(draft.ActionConfig?.DeepClone() ?? new JsonObject());
+            var clears = (JsonObject)config.DeepClone();
+            config.Remove(ActionConfigExtensions.ClearSecretsField);
             var action = FindAction(draft.ActionType);
             if (draft.Id == 0 || action == null)
             {
@@ -312,7 +322,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                 var empty = !config.TryGetPropertyValue(field, out var node) || node == null ||
                             (node is JsonValue value && value.TryGetValue<string>(out var text) &&
                              string.IsNullOrWhiteSpace(text));
-                if (empty && stored.ActionConfig.TryGetPropertyValue(field, out var secret) && secret != null)
+                if (empty && !clears.ClearsSecret(field) &&
+                    stored.ActionConfig.TryGetPropertyValue(field, out var secret) && secret != null)
                 {
                     config[field] = secret.DeepClone();
                 }

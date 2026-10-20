@@ -44,7 +44,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
         private readonly ConcurrentDictionary<long, Task> _running = new();
 
-        private volatile IReadOnlyList<IntegrationDefinition> _integrations;
+        // The enabled integrations, read again after a change. The version keeps a list read before a change from
+        // being cached after it.
+        private readonly object _integrationsLock = new();
+        private IReadOnlyList<IntegrationDefinition> _integrations;
+        private long _integrationsVersion;
         private int _droppedEvents;
 
         public IntegrationDispatcher(IntegrationStore store, IEventBus events, IEnumerable<IIntegrationAction> actions,
@@ -54,10 +58,44 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             _eventTypes = eventTypes;
             _retention = retention;
             _identity = identity;
-            _actions = actions.ToDictionary(a => a.Type, StringComparer.Ordinal);
+            _actions = IntegrationActions.ByType(actions);
             events.EventPublished += OnEventPublished;
-            store.IntegrationsChanged += () => _integrations = null;
+            store.IntegrationsChanged += OnIntegrationsChanged;
             store.ExecutionsChanged += Wake;
+        }
+
+        private void OnIntegrationsChanged()
+        {
+            lock (_integrationsLock)
+            {
+                _integrationsVersion++;
+                _integrations = null;
+            }
+        }
+
+        private IReadOnlyList<IntegrationDefinition> EnabledIntegrations()
+        {
+            long version;
+            lock (_integrationsLock)
+            {
+                if (_integrations != null)
+                {
+                    return _integrations;
+                }
+
+                version = _integrationsVersion;
+            }
+
+            var integrations = _store.List().Where(i => i.Enabled).ToList();
+            lock (_integrationsLock)
+            {
+                if (_integrationsVersion == version)
+                {
+                    _integrations = integrations;
+                }
+            }
+
+            return integrations;
         }
 
         private void OnEventPublished(SrsEvent srsEvent)
@@ -123,7 +161,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>Queues a run for every enabled integration whose trigger and conditions match the event.</summary>
         internal void Match(SrsEvent srsEvent)
         {
-            var integrations = _integrations ??= _store.List().Where(i => i.Enabled).ToList();
+            var integrations = EnabledIntegrations();
             JsonElement? data = null;
             foreach (var integration in integrations)
             {
@@ -237,6 +275,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Integration run {execution.Id} failed unexpectedly");
+                // Left running, it would hold back every later run of the integration until a restart.
+                try
+                {
+                    _store.Finish(execution.Id, ExecutionStatus.Failed, "Failed unexpectedly: " + ex.Message, null, null);
+                }
+                catch (Exception finishError)
+                {
+                    Logger.Error(finishError, $"Unable to record integration run {execution.Id} as failed");
+                }
             }
             finally
             {
@@ -266,6 +313,15 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             {
                 _store.Finish(execution.Id, ExecutionStatus.Failed,
                     $"The action \"{integration.ActionType}\" is not available on this server.", null, null);
+                return;
+            }
+
+            if (integration.UnreadableSecrets.Count > 0)
+            {
+                // Retrying can't help: the keys that encrypted them are gone (e.g. the keys folder was replaced).
+                _store.Finish(execution.Id, ExecutionStatus.Failed,
+                    $"The stored {string.Join(", ", integration.UnreadableSecrets)} can't be read; enter it again on the " +
+                    "integration page.", null, null);
                 return;
             }
 

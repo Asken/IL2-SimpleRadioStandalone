@@ -213,7 +213,8 @@ Servers from before the plugin kept integrations in `srs.db`; the plugin moves t
 first starts. An integration runs an action when one of its trigger events happens: add one or more events (for example
 **Server started** and **Server stopped**), optional conditions on the event data, and the action. **Test** runs it
 once for each trigger event with example data. Webhook URLs and headers are stored encrypted with the keys in `keys/`
-and never shown again; leave them empty when editing to keep the stored value.
+and never shown again; leave them empty when editing to keep the stored value. To remove stored headers, tick
+**Remove the stored headers**, or send `"clearSecrets": ["headers"]` in `config`.
 
 Messages and request bodies are [Scriban](https://github.com/scriban/scriban/blob/master/doc/language.md) templates
 over the event data shown on the integration page, with a live preview:
