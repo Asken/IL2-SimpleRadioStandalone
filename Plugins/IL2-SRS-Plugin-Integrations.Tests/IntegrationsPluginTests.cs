@@ -85,13 +85,30 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
             return request;
         }
 
+        /// <summary>
+        /// A port the server can open for both TCP and UDP. A free TCP port isn't always free for UDP: Windows
+        /// reserves some UDP ranges (e.g. for Hyper-V), so the UDP bind is tried too.
+        /// </summary>
         private static int FindFreePort()
         {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
+            for (var attempt = 0; ; attempt++)
+            {
+                var listener = new TcpListener(IPAddress.Any, 0);
+                listener.Start();
+                try
+                {
+                    var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                    using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+                    return port;
+                }
+                catch (SocketException) when (attempt < 20)
+                {
+                }
+                finally
+                {
+                    listener.Stop();
+                }
+            }
         }
     }
 
@@ -246,7 +263,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
         /// <summary>A srs.db as this fork's servers left it before the plugin: version 5, integrations included.</summary>
         private static void CreateServerDatabaseWithIntegrations(string path)
         {
-            using (var connection = new SqliteConnection("Data Source=" + path))
+            using (var connection = new SqliteConnection("Data Source=" + path + ";Pooling=False"))
             {
                 connection.Open();
                 using var command = connection.CreateCommand();
@@ -266,8 +283,6 @@ INSERT INTO integrations VALUES (7, 'Post joins', NULL, 1, 'client.connected', '
 PRAGMA user_version = 5;";
                 command.ExecuteNonQuery();
             }
-
-            SqliteConnection.ClearAllPools();
         }
     }
 }

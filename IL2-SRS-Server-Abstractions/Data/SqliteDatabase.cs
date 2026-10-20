@@ -33,14 +33,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
         {
             ArgumentNullException.ThrowIfNull(migrations);
             DatabasePath = databasePath;
-            _connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = databasePath,
-                Mode = SqliteOpenMode.ReadWriteCreate,
-                Cache = SqliteCacheMode.Private,
-                Pooling = true,
-                DefaultTimeout = 30
-            }.ToString();
+            _connectionString = ConnectionString(databasePath);
 
             Initialize(migrations);
         }
@@ -57,6 +50,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
             return connection;
         }
 
+        /// <summary>
+        /// Closes the pooled connections to the database at <paramref name="databasePath"/>, so the file can be
+        /// deleted or replaced. Pools of other databases are left alone.
+        /// </summary>
+        public static void ClearPool(string databasePath)
+        {
+            using var connection = new SqliteConnection(ConnectionString(databasePath));
+            SqliteConnection.ClearPool(connection);
+        }
+
         public static string FormatTimestamp(DateTime utc)
         {
             return utc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
@@ -70,6 +73,18 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
         public static DateTime? ParseNullableTimestamp(object value)
         {
             return value is string text && text.Length > 0 ? ParseTimestamp(text) : (DateTime?)null;
+        }
+
+        private static string ConnectionString(string databasePath)
+        {
+            return new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                Cache = SqliteCacheMode.Private,
+                Pooling = true,
+                DefaultTimeout = 30
+            }.ToString();
         }
 
         private void Initialize(IReadOnlyList<IReadOnlyList<string>> migrations)
