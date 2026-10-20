@@ -349,13 +349,30 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             return JsonDocument.Parse(line).RootElement.Clone();
         }
 
+        /// <summary>
+        /// A port the server can open for both TCP and UDP. A free TCP port isn't always free for UDP: Windows
+        /// reserves some UDP ranges (e.g. for Hyper-V), so the UDP bind is tried too.
+        /// </summary>
         internal static int FindFreePort()
         {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
+            for (var attempt = 0; ; attempt++)
+            {
+                var listener = new TcpListener(IPAddress.Any, 0);
+                listener.Start();
+                try
+                {
+                    var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                    using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+                    return port;
+                }
+                catch (SocketException) when (attempt < 20)
+                {
+                }
+                finally
+                {
+                    listener.Stop();
+                }
+            }
         }
     }
 }

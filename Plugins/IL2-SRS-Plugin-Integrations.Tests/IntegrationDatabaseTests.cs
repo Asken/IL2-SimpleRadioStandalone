@@ -27,7 +27,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
                 command.ExecuteNonQuery();
             }
 
-            SqliteConnection.ClearAllPools();
+            SqliteDatabase.ClearPool(database.DatabasePath);
             var reopened = temp.CreateIntegrationDatabase();
 
             Assert.Equal(before, Snapshot(reopened));
