@@ -54,6 +54,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         private readonly DirectInput _directInput;
         private readonly object _inputDevicesLock = new object();
         private readonly Dictionary<Guid, Device> _inputDevices = new Dictionary<Guid, Device>();
+        private readonly DeviceIdentityCache<Device> _deviceIdentities = new DeviceIdentityCache<Device>(ReadDeviceIdentity);
+        // Bound devices not found during the current PTT poll (PTT thread only), named in the slow-poll warning.
+        private readonly HashSet<string> _missingBoundDevicesThisPoll = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly MainWindow.ToggleOverlayCallback _toggleOverlayCallback;
         private readonly Action _togglePilotRosterCallback;
         private readonly Action _toggleClientListCallback;
@@ -562,6 +565,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                 while (_detectPtt)
                 {
                     MarkPttInputPoll();
+                    _missingBoundDevicesThisPoll.Clear();
                     var pollStopwatch = Stopwatch.StartNew();
                     try
                     {
@@ -965,8 +969,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
             }
 
             Interlocked.Exchange(ref _lastSlowPttInputPollLogTicks, now);
+            var missing = _missingBoundDevicesThisPoll.Count > 0
+                ? " Bound devices not found: " + string.Join(", ", _missingBoundDevicesThisPoll) + "."
+                : string.Empty;
             Logger.Warn($"PTT input polling took {elapsedMilliseconds}ms across {bindingCount} configured bindings. " +
-                        "Slow DirectInput devices can delay PTT and other keybinds.");
+                        "Slow DirectInput devices can delay PTT and other keybinds." + missing);
         }
 
         private bool GetButtonState(InputDevice inputDeviceBinding, Dictionary<Guid, object> deviceStateCache)
@@ -982,6 +989,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
                     return recoveredButtonState;
                 }
 
+                _missingBoundDevicesThisPoll.Add($"{NormalizeDeviceName(inputDeviceBinding.DeviceName)} ({inputDeviceBinding.InputBind})");
                 RequestDeviceReconnect();
                 return false;
             }
@@ -1291,11 +1299,17 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
             }
         }
 
+        private static DeviceIdentity ReadDeviceIdentity(Device device)
+        {
+            var information = device.Information;
+            return new DeviceIdentity(information.ProductGuid, information.ProductName.Trim().Replace("\0", ""));
+        }
+
         private string GetDeviceName(Device device)
         {
             try
             {
-                return device.Information.ProductName.Trim().Replace("\0", "");
+                return _deviceIdentities.Get(device).ProductName;
             }
             catch
             {
@@ -1307,7 +1321,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Client.Settings
         {
             try
             {
-                return device.Information.ProductGuid;
+                return _deviceIdentities.Get(device).ProductGuid;
             }
             catch
             {
