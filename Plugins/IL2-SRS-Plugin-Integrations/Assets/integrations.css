@@ -99,3 +99,12 @@
 @media (max-width: 760px) {
     :root[data-theme="srs"] .mobile-cards tbody tr { background: var(--well); border-color: var(--rim); border-radius: 4px; box-shadow: 0 1px 0 var(--highlight); }
 }
+
+/* "Remove the stored …" under a secret field. */
+.secret-clear {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+    font-size: 0.9em;
+}

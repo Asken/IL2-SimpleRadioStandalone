@@ -27,6 +27,12 @@
 - The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
 - Web server: two bans added at the same moment could leave one of them out of the list checked when clients connect, until the next ban change.
 - Web server: a plugin that failed while setting up could still run part of itself, such as a background task. It now leaves nothing behind.
+- Integrations: a run that failed unexpectedly could hold back every later run of its integration until a restart. It is now marked failed.
+- Integrations: an integration created or enabled at the same moment an event arrived could stay unused until another integration changed.
+- Integrations: stored HTTP headers can be removed, with **Remove the stored headers** or `"clearSecrets": ["headers"]` in the API.
+- Integrations: **Run again** gives a failed run its retries again.
+- Integrations: when a stored webhook address can't be read (the `keys` folder was replaced), runs fail at once and say to enter it again, instead of retrying with an unclear error.
+- Integrations: two actions with the same type no longer stop the server from starting; the second is ignored and logged.
 
 ### Compatibility
 

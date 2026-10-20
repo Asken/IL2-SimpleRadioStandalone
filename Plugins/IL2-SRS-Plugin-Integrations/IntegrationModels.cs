@@ -69,6 +69,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         /// <summary>For each stored secret field: a hint such as "ends in 0Jdl".</summary>
         public IReadOnlyDictionary<string, string> SecretHints { get; init; } = new Dictionary<string, string>();
 
+        /// <summary>Stored secret fields that can't be decrypted (the keys that protected them are gone).</summary>
+        public IReadOnlyCollection<string> UnreadableSecrets { get; init; } = Array.Empty<string>();
+
         public RetryMode RetryMode { get; init; } = RetryMode.None;
         public int MaxRetries { get; init; }
         public DateTime CreatedAtUtc { get; init; }

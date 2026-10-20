@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,9 +90,28 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
         }
 
         protected string SecretPlaceholder(string field, string placeholder) =>
-            SecretHints.TryGetValue(field, out var hint)
-                ? $"Stored — {hint}. Enter a new value to replace it."
+            HasStoredSecret(field) && !Config.ClearsSecret(field)
+                ? $"Stored — {SecretHints[field]}. Enter a new value to replace it."
                 : placeholder;
+
+        /// <summary>True when the saved integration has a value for this secret field.</summary>
+        protected bool HasStoredSecret(string field) => SecretHints.ContainsKey(field);
+
+        /// <summary>Marks a stored secret field to be removed on save, or keeps it again.</summary>
+        protected Task SetSecretCleared(string field, bool cleared)
+        {
+            var fields = (Config[ActionConfigExtensions.ClearSecretsField] as JsonArray)?
+                .Select(f => f?.GetValue<string>()).Where(f => f != null && f != field).ToList() ?? new List<string>();
+            if (cleared)
+            {
+                fields.Add(field);
+            }
+
+            Config[ActionConfigExtensions.ClearSecretsField] = fields.Count == 0
+                ? null
+                : new JsonArray(fields.Select(f => (JsonNode)JsonValue.Create(f)).ToArray());
+            return NotifyChanged();
+        }
 
         protected Task NotifyChanged() => ConfigChanged.InvokeAsync();
 
@@ -112,6 +132,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
     public static class ActionConfigExtensions
     {
+        /// <summary>
+        /// Secret fields to remove when saving, e.g. <c>"clearSecrets": ["headers"]</c>. An empty secret field keeps
+        /// its stored value instead. Never stored.
+        /// </summary>
+        public const string ClearSecretsField = "clearSecrets";
+
+        /// <summary>True when the settings ask to remove a stored secret field.</summary>
+        public static bool ClearsSecret(this JsonObject config, string field)
+        {
+            return config != null && config.TryGetPropertyValue(ClearSecretsField, out var node) && node is JsonArray fields &&
+                   fields.Any(f => f is JsonValue value && value.TryGetValue<string>(out var name) && name == field);
+        }
+
         /// <summary>A text setting, or null when it is missing or blank.</summary>
         public static string GetText(this JsonObject config, string field)
         {
@@ -119,6 +152,27 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
                    value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
                 ? text
                 : null;
+        }
+    }
+
+    internal static class IntegrationActions
+    {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>The actions by type. A second action with a type already taken is left out and logged.</summary>
+        public static Dictionary<string, IIntegrationAction> ByType(IEnumerable<IIntegrationAction> actions)
+        {
+            var byType = new Dictionary<string, IIntegrationAction>(StringComparer.Ordinal);
+            foreach (var action in actions)
+            {
+                if (!byType.TryAdd(action.Type, action) && !ReferenceEquals(byType[action.Type], action))
+                {
+                    Logger.Warn($"Integration action {action.GetType().FullName} ignored: " +
+                                $"{byType[action.Type].GetType().FullName} already uses the type \"{action.Type}\".");
+                }
+            }
+
+            return byType;
         }
     }
 
