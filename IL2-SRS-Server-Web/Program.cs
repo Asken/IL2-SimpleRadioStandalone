@@ -221,6 +221,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server
             // Friendly "not found" page for the admin UI only; API, login and health responses keep their own bodies.
             app.UseWhen(context => !IsMachineEndpoint(context.Request.Path),
                 branch => branch.UseStatusCodePagesWithReExecute("/not-found"));
+            // After the status code pages, so the re-executed request is matched to /not-found again; when left to
+            // WebApplication, routing runs first and the re-executed request finds no page (an empty 404).
+            app.UseRouting();
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseRateLimiter();

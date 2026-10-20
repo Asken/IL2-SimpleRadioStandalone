@@ -26,6 +26,7 @@
 ### Fixed
 
 - The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
+- Web server: an address that doesn't exist shows the **Page not found** page with a link to the dashboard, instead of an empty page.
 - Web server: two bans added at the same moment could leave one of them out of the list checked when clients connect, until the next ban change.
 - Web server: a plugin that failed while setting up could still run part of itself, such as a background task. It now leaves nothing behind.
 - Integrations: a run that failed unexpectedly could hold back every later run of its integration until a restart. It is now marked failed.
