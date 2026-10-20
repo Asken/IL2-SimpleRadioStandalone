@@ -194,8 +194,9 @@ dotnet test --project IL2-SRS-Server-Web.Tests
 
 [`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload
 (`dotnet watch`): edits to `.razor`, `.cs` and `.css` files apply to the running server, which restarts itself
-when an edit can't be applied in place. It uses the same data volume and ports as the image (`il2-srs-data`,
-6002 and `127.0.0.1:8081`), so stop that container first, and reads `SRS_ADMIN_PASSWORD` from
+when an edit can't be applied in place. It keeps its data in its own volume (`il2-srs-dev-data`), so it never touches the
+image's database, but uses the same SRS port (6002), so stop that container first. It serves the admin UI on
+`127.0.0.1:8081` and reads `SRS_ADMIN_PASSWORD` from
 `IL2-SRS-Server-Web/.env` (git-ignored).
 
 ```sh

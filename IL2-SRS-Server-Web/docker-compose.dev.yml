@@ -4,8 +4,9 @@
 #   docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml up -d
 #   docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml logs -f
 #
-# Put SRS_ADMIN_PASSWORD in IL2-SRS-Server-Web/.env (git-ignored). It uses the data volume and ports of a
-# server started from the image (il2-srs-data, 6002, 127.0.0.1:8081), so stop that container first.
+# Put SRS_ADMIN_PASSWORD in IL2-SRS-Server-Web/.env (git-ignored). Its data is in its own volume (il2-srs-dev-data),
+# so it never upgrades the database of a server started from the image; it uses the same SRS port (6002), so stop
+# that container first.
 
 services:
   il2-srs-server-dev:
@@ -50,11 +51,10 @@ services:
       - dev-bin:/src/IL2-SRS-Server-Web/bin
       - dev-obj:/src/IL2-SRS-Server-Web/obj
       - dev-nuget:/root/.nuget/packages
-      - il2-srs-data:/data
+      - il2-srs-dev-data:/data
 
 volumes:
   dev-bin:
   dev-obj:
   dev-nuget:
-  il2-srs-data:
-    external: true
+  il2-srs-dev-data:
