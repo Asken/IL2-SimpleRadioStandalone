@@ -195,6 +195,22 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         [Fact]
+        public async Task UnknownAddressesShowTheNotFoundPageExceptInTheApi()
+        {
+            var token = TestContext.Current.CancellationToken;
+
+            using (var page = await _http.GetAsync("/does-not-exist", token))
+            {
+                Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
+                Assert.Contains("Page not found", await page.Content.ReadAsStringAsync(token));
+            }
+
+            using var api = await _http.GetAsync("/api/v1/does-not-exist", token);
+            Assert.Equal(HttpStatusCode.NotFound, api.StatusCode);
+            Assert.DoesNotContain("Page not found", await api.Content.ReadAsStringAsync(token));
+        }
+
+        [Fact]
         public async Task ApiRequiresAKeyWithTheRightScope()
         {
             var keys = _app.Services.GetRequiredService<ApiKeyStore>();
