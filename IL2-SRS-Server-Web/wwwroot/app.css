@@ -521,15 +521,19 @@ input[aria-invalid="true"]:focus-visible, select[aria-invalid="true"]:focus-visi
 :root[data-theme="srs"] body { min-height: 100vh; background: radial-gradient(ellipse at top, #42474a, #2c2f31); }
 :root[data-theme="srs"] h1 { font-family: var(--stencil); font-weight: 400; text-transform: uppercase; letter-spacing: .04em; }
 
-/* Equipment plates */
+/* Equipment plates: worn paint from one of three textures, so neighbouring plates differ, and dirt along the edges. */
 :root[data-theme="srs"] .panel,
 :root[data-theme="srs"] .tile,
 :root[data-theme="srs"] .login-card,
 :root[data-theme="srs"] .reconnect-card {
-    background: var(--screws), var(--plate);
+    --wear: url("textures/plate-wear-1.svg") 0 0;
+    background: var(--screws), var(--wear) / 800px 800px, var(--plate);
     border: 1px solid var(--rim);
-    box-shadow: inset 1px 1px 0 var(--highlight), 0 2px 6px rgb(0 0 0 / .35);
+    box-shadow: inset 1px 1px 0 var(--highlight), inset 0 0 22px rgb(20 16 10 / .3), 0 2px 6px rgb(0 0 0 / .35);
 }
+
+:root[data-theme="srs"] :is(.panel, .tile):nth-child(3n + 2) { --wear: url("textures/plate-wear-2.svg") -170px -230px; }
+:root[data-theme="srs"] :is(.panel, .tile):nth-child(3n) { --wear: url("textures/plate-wear-3.svg") -340px -90px; }
 
 :root[data-theme="srs"] .panel { padding: 1rem 1.75rem 1.1rem; }
 :root[data-theme="srs"] .login-card { padding: 1.75rem; }

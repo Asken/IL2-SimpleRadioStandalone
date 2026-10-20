@@ -14,6 +14,7 @@
 
 ### Changed
 
+- Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges.
 - Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
 - Web server: form mistakes, such as a password that is too short, are shown under the field instead of in a browser popup.
 - Web server: the admin page reconnects sooner after the server restarts, and reloads by itself when its session has expired.

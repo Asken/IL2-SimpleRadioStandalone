@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+<!-- Worn paint for the IL-2 SRS theme's panels; tiles seamlessly. -->
+<defs>
+<filter id="grain" x="0" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="712" stitchTiles="stitch"/>
+<feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 -1.55"/>
+</filter>
+<filter id="fleck" x="0" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="1" seed="873" stitchTiles="stitch"/>
+<feColorMatrix values="0 0 0 0 .93 0 0 0 0 .92 0 0 0 0 .87 4 0 0 0 -2.3"/>
+</filter>
+<filter id="mottle" x="0" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency=".007" numOctaves="4" seed="451" stitchTiles="stitch"/>
+<feColorMatrix values="0 0 0 0 .07 0 0 0 0 .06 0 0 0 0 .04 2.2 0 0 0 -.95"/>
+</filter>
+<filter id="grime" x="0" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="3" seed="542" stitchTiles="stitch"/>
+<feColorMatrix values="0 0 0 0 .16 0 0 0 0 .13 0 0 0 0 .08 7 0 0 0 -4.1"/>
+</filter>
+</defs>
+<rect width="800" height="800" filter="url(#mottle)" opacity=".2"/>
+<rect width="800" height="800" filter="url(#grime)" opacity=".1"/>
+<rect width="800" height="800" filter="url(#grain)" opacity=".25"/>
+<rect width="800" height="800" filter="url(#fleck)" opacity=".06"/>
+<g fill="none" stroke-linecap="round">
+<path d="M740.9 698.2Q763.7 743.8 779.9 792 M571.7 223.2Q577.1 226.6 583.5 227.3 M398.7 34.9Q413.9 41.8 424.8 54.6 M300.5 150.7Q241 162.9 180.2 162.6 M760.7 455.5Q753.1 484.3 744 512.6 M508.2 158.3Q507.7 167.4 503.6 175.6 M343.9 451.7Q375 470 410.6 475.5 M432 699.8Q444.2 706 457.5 708.8 M557.4 649.7Q547.9 653 537.9 653.1 M761 62.5Q751.4 71.6 746.7 83.9 M631.8 741.1Q635.7 755.9 645.6 767.5 M306.5 166.9Q301.4 172.1 296.1 177 M244.7 89.7Q255.7 100.1 265.9 111.3 M704.7 358Q693.3 360.7 682.6 365.5 M333.6 546.7Q331.5 566.3 327.9 585.7 M247.1 673.9Q268.2 682.9 290.2 689.2 M272.7 445.1Q280.8 463.3 292 479.7 M106.4 694.1Q170.4 691.1 234.3 695.6 M617.1 127.8Q634.7 137.9 651.8 148.8 M341.1 82.2Q341.4 99.8 338.3 117.1" stroke="#f2eee0" stroke-opacity=".11" stroke-width=".7"/>
+<path d="M192.1 67.3Q180.5 84.4 170.7 102.7 M241.6 262.9Q277.6 273.6 305.8 298.3 M694 527.6Q658.4 586.4 616.6 640.8 M698.8 770.9Q658.6 776.5 618.1 773.5" stroke="#000" stroke-opacity=".28" stroke-width="1.1"/>
+<path d="M192.1 67.3Q180.5 84.4 170.7 102.7 M241.6 262.9Q277.6 273.6 305.8 298.3 M694 527.6Q658.4 586.4 616.6 640.8 M698.8 770.9Q658.6 776.5 618.1 773.5" stroke="#f2eee0" stroke-opacity=".16" stroke-width=".6" transform="translate(-.7 -.7)"/>
+<path d="M41 61.2l-4.3 3.5M36.8 59.6l-5.4 4.4M34.4 60.4l-7.9 6.4M34.4 54.9l-13.1 10.7M512.8 163.2l-17.1 1.3M517.1 157l-15.3 1.1M511.9 158.2l-6.3 0.5M513.6 153.5l-7.8 0.6M517.3 155l-7.9 0.6M470.5 729.9l-4.4 7.9M470.8 729.6l-3.3 5.8M467.3 727.4l-2.7 4.8M465.7 726.2l-5.9 10.4M462.7 721.4l-4.5 7.9M463.7 723.7l-5.1 9M459.9 723.8l-5.3 9.4M462.1 722.8l-8.6 15.3M430.1 488.4l3.4 14.7M430.9 487.1l3 12.9M429.6 490.3l2.2 9.3M428 494l3.7 15.9M423 494.4l3.3 14.4M422.9 493.5l3.8 16.6M423.6 495l3.5 15M419.6 492.2l1.7 7.5M508.9 663.5l-9.4 7.6M508.9 666.2l-4.1 3.3M509.4 664.4l-5.4 4.4M510.4 661.4l-5 4.1M509.2 656.5l-12.2 9.9M503.8 660.5l-11.1 9.1" stroke="#f2eee0" stroke-opacity=".07" stroke-width=".8"/>
+</g>
+<path d="M410.3 222.5L409.5 224.1L407.8 223.8L408 221.7L409.2 220.4ZM121.7 771.1L121.5 771.6L121 771.5L120.5 771.4L120.4 771L120.7 770.5L121.1 770.7L121.4 770.5ZM488 659.1L487.7 660.6L486.5 659.7L486.3 658.5L487.6 658.2ZM474.9 736.7L473 739.4L470.2 738L470.9 736.2L473.1 735.6ZM401.9 777.4L401 779L399.2 778.7L399.5 776L401.6 774.6ZM87.4 111.7L85.4 113.6L83.2 113.9L82.8 110.4L85.8 109.1ZM274.3 82.3L274.3 83L273.4 82.9L272.3 83.2L272.7 82.3L272.8 81.1L273.1 80.4L274.6 81.1ZM673.4 271.7L673.3 272.8L671.6 273.1L671 271.7L671.8 270.4L672.8 270.7ZM577.6 577.4L576.4 578.8L575.1 578.2L573.4 578.2L574.1 576.7L574.4 575.1L576.9 575.9ZM710.4 658.9L708.9 661L707 661.3L706.6 660.4L706.5 658.1L707.6 657.6L709.6 657.6ZM50.9 302.5L50.9 304L49.6 303.2L48.7 302L50.4 301.7ZM689.5 643.3L687.6 645.3L686 644.8L684.2 642.3L685.8 640.1L688.4 641.1ZM511.4 44.6L510.3 45L508.9 45.6L508.9 44.7L508.4 43.2L508.7 42.3L510.8 42.8ZM641.1 210.1L639.6 210.5L637.7 211.3L637.1 209L637.7 208.3L639.5 208.5ZM647 179.8L646.6 180.4L646.4 180.7L645.6 180L646.1 179.7L646.3 179.5L646.8 179.3ZM557.2 459.9L557.2 462L554.8 460.6L552.8 458.3L557.2 457.2Z" fill="#9fa19c" fill-opacity=".18"/>
+</svg>
