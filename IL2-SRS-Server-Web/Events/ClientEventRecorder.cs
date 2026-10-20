@@ -177,11 +177,11 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Events
         {
             var client = change.Client;
             var ipAddress = _clientAddresses.TryGetValue(client.ClientGuid, out var address) ? address : null;
-            var channelNames = _settings.GetChannelNames();
             var current = change.Current;
             var previous = change.Previous;
-            var channelName = current.Channel > 0 && channelNames.TryGetValue(current.Channel, out var name)
-                ? name
+            // The name the pilot sees: their coalition's own name, else the shared one.
+            var channelName = current.Channel > 0
+                ? _settings.GetChannelNameSet().Resolve(current.Channel, client.Coalition)
                 : null;
 
             var payload = EventPayload.Client(client, ipAddress).With("radio", new JsonObject

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using Ciribob.IL2.SimpleRadio.Standalone.Common;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
+using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Data;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
@@ -226,6 +227,25 @@ PRAGMA user_version = " + userVersion + ";";
         }
 
         [Fact]
+        public void RadioEventUsesThePilotsCoalitionChannelName()
+        {
+            using var temp = new TempDirectory();
+            var (events, published, recorder) = Create(temp,
+                alliesChannelNames: new Dictionary<int, string> { [4] = "Allied Tower" });
+            using var _ = recorder;
+            var client = Pilot();
+            var previous = client.GameState;
+            client.GameState = OnChannel(4);
+
+            events.PublishClientUpdated(client, client.Name, client.Coalition, previous);
+            recorder.FlushRadioChanges(DateTime.UtcNow + TimeSpan.FromMinutes(1));
+
+            var tuned = Assert.Single(published);
+            Assert.Contains("\"Allied Tower\"", tuned.Message);
+            Assert.Equal("Allied Tower", tuned.Payload.GetProperty("radio").GetProperty("channelName").GetString());
+        }
+
+        [Fact]
         public void IgnoresARadioTunedAwayAndBack()
         {
             using var temp = new TempDirectory();
@@ -281,12 +301,17 @@ PRAGMA user_version = " + userVersion + ";";
         }
 
         private static (ServerEvents, List<SrsEvent>, ClientEventRecorder) Create(TempDirectory temp,
-            IDictionary<int, string> channelNames = null)
+            IDictionary<int, string> channelNames = null, IDictionary<int, string> alliesChannelNames = null)
         {
             var settings = new ServerSettingsStore(temp.CreateDatabase(), NoOverrides);
             if (channelNames != null)
             {
                 settings.SetChannelNames(channelNames);
+            }
+
+            if (alliesChannelNames != null)
+            {
+                settings.SetChannelNames(ChannelNameSettings.AlliesCoalition, alliesChannelNames);
             }
 
             var events = new ServerEvents();
