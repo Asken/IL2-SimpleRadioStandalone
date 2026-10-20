@@ -42,7 +42,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Components.Shared
         {
         }
 
-        private void QueueRefresh()
+        /// <summary>Re-renders soon (at most every 250 ms); safe to call from any thread.</summary>
+        protected void QueueRefresh()
         {
             if (Interlocked.Exchange(ref _refreshQueued, 1) == 1)
             {

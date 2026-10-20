@@ -15,7 +15,8 @@ What it adds over the WPF server:
   equipment panels) and is remembered per browser.
 - SQLite database (`srs.db`) for settings, channel names, bans with reason and expiry, the event log and API keys.
 - Settings can be fixed from the environment (`SRS_<SETTING>`); they are then locked in the UI.
-- Event log of logins, admin actions, server start/stop and client connections, with automatic retention.
+- Live event log of logins, admin actions, server start/stop, client connections, name and coalition changes and
+  radio retuning. Every event has a type (e.g. `client.connected`) and a JSON payload; automatic retention.
 - REST API with read and write API keys, described by an OpenAPI document and browsable in the
   Scalar API reference at `/scalar`.
 - Published image: [`asken/il2-srs-server`](https://hub.docker.com/r/asken/il2-srs-server) with a built-in Docker health check.
@@ -173,7 +174,8 @@ other keys.
 | `GET`, `PUT /api/v1/channel-names` | read, write | Shared channel names; `PUT` body `{ "channelNames": { "1": "Ops" } }` |
 | `GET`, `PUT /api/v1/channel-names/{coalition}` | read, write | Allied or Axis names (`allies`, `axis`) that replace the shared name for that coalition; same body. `PUT` leaves the shared names and the other coalition unchanged |
 | `GET /api/v1/bans`, `POST /api/v1/bans`, `DELETE /api/v1/bans/{id}` | read, write | Bans; `POST` body `{ "ipAddress": "203.0.113.7", "reason": "...", "durationMinutes": null }` |
-| `GET /api/v1/events?category=&search=&since=&limit=` | read | Event log, newest first |
+| `GET /api/v1/events?category=&type=&client=&search=&since=&limit=` | read | Event log, newest first, with each event's type and payload |
+| `GET /api/v1/event-types` | read | Event types and their payload fields |
 | `DELETE /api/v1/events` | write | Clear the event log |
 | `POST /api/v1/server/start`, `/stop`, `/restart` | write | Server lifecycle |
 
@@ -188,6 +190,17 @@ Requires the .NET 10 SDK.
 ```sh
 dotnet run --project IL2-SRS-Server-Web -- --data-dir ./data --SRS_ADMIN_PASSWORD=dev-password
 dotnet test --project IL2-SRS-Server-Web.Tests
+```
+
+[`docker-compose.dev.yml`](docker-compose.dev.yml) runs the server from source in Docker with hot reload
+(`dotnet watch`): edits to `.razor`, `.cs` and `.css` files apply to the running server, which restarts itself
+when an edit can't be applied in place. It keeps its data in its own volume (`il2-srs-dev-data`), so it never touches the
+image's database, but uses the same SRS port (6002), so stop that container first. It serves the admin UI on
+`127.0.0.1:8081` and reads `SRS_ADMIN_PASSWORD` from
+`IL2-SRS-Server-Web/.env` (git-ignored).
+
+```sh
+docker compose -f IL2-SRS-Server-Web/docker-compose.dev.yml up -d --build
 ```
 
 The network code under `Network/` is adapted from the WPF server (`IL2-SimpleRadio Server`), and

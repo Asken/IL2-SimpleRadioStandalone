@@ -3,18 +3,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Text.Json.Nodes;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Setting;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Api;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Settings;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 {
     /// <summary>
-    /// Everything the admin UI and the API read or change. Every change is recorded in the event log
-    /// with the actor ("admin" for the UI, "api:&lt;key name&gt;" for API keys).
+    /// Everything the admin UI and the API read or change. Every change is published as a typed event
+    /// (stored in the event log) with the actor ("admin" for the UI, "api:&lt;key name&gt;" for API keys).
     /// </summary>
     public sealed class ServerAdminService
     {
@@ -78,12 +80,14 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
             try
             {
                 _serverState.Start();
-                Audit.Write(AuditCategory.Server, actor, $"Started the server on port {_serverState.Port}");
+                Events.Publish(SrsEventTypes.ServerStarted, actor, $"Started the server on port {_serverState.Port}",
+                    ServerPayload());
                 return null;
             }
             catch (Exception ex)
             {
-                Audit.Write(AuditCategory.Server, actor, "Failed to start the server: " + ex.Message);
+                Events.Publish(SrsEventTypes.ServerStartFailed, actor, "Failed to start the server: " + ex.Message,
+                    ServerPayload().With("error", ex.Message));
                 return ex.Message;
             }
         }
@@ -95,8 +99,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return;
             }
 
+            var payload = ServerPayload();
             _serverState.Stop();
-            Audit.Write(AuditCategory.Server, actor, "Stopped the server");
+            Events.Publish(SrsEventTypes.ServerStopped, actor, "Stopped the server", payload);
         }
 
         /// <summary>Stops and starts the server so port and startup-only settings take effect.</summary>
@@ -109,12 +114,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
         public bool KickClient(string clientGuid, string actor)
         {
             var client = FindClient(clientGuid);
+            var payload = client != null ? ClientPayload(client) : null;
             if (client == null || !_serverState.KickClient(clientGuid))
             {
                 return false;
             }
 
-            Audit.Write(AuditCategory.Admin, actor, $"Kicked {Describe(client)}");
+            Events.Publish(SrsEventTypes.ClientKicked, actor, $"Kicked {Describe(client)}", payload);
             return true;
         }
 
@@ -126,10 +132,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return null;
             }
 
+            var payload = ClientPayload(client);
             var ban = _serverState.BanClient(clientGuid, reason, actor, ExpiresAt(duration));
             if (ban != null)
             {
-                Audit.Write(AuditCategory.Admin, actor, $"Banned {Describe(client)} at {ban.IpAddress}{DescribeBan(ban)}");
+                Events.Publish(SrsEventTypes.ClientBanned, actor,
+                    $"Banned {Describe(client)} at {ban.IpAddress}{DescribeBan(ban)}",
+                    payload.With(EventPayload.Ban(ban)));
             }
 
             return ban;
@@ -143,7 +152,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return false;
             }
 
-            Audit.Write(AuditCategory.Admin, actor, $"{(muted ? "Muted" : "Unmuted")} {Describe(client)}");
+            Events.Publish(muted ? SrsEventTypes.ClientMuted : SrsEventTypes.ClientUnmuted, actor,
+                $"{(muted ? "Muted" : "Unmuted")} {Describe(client)}", ClientPayload(client));
             return true;
         }
 
@@ -153,21 +163,36 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
 
         public int ActiveBanCount => _bans.ActiveCount;
 
+        /// <summary>Checks an address to ban; returns an error message or null.</summary>
+        public static string ValidateIpAddress(string ipAddress)
+        {
+            var text = (ipAddress ?? string.Empty).Trim();
+            if (text.Length == 0)
+            {
+                return "Enter the IP address to ban.";
+            }
+
+            return IPAddress.TryParse(text, out _) ? null : "Enter a valid IPv4 or IPv6 address, e.g. 203.0.113.7.";
+        }
+
         /// <summary>Bans an IP address directly; returns an error message or null.</summary>
         public string BanAddress(string ipAddress, string playerName, string reason, TimeSpan? duration, string actor,
             out BanRecord ban)
         {
             ban = null;
-            if (!IPAddress.TryParse((ipAddress ?? string.Empty).Trim(), out var address))
+            if (ValidateIpAddress(ipAddress) is { } error)
             {
-                return "Enter a valid IPv4 or IPv6 address.";
+                return error;
             }
+
+            var address = IPAddress.Parse(ipAddress.Trim());
 
             ban = _bans.Add(address, playerName, reason, actor, ExpiresAt(duration));
             var disconnected = _serverState.DisconnectAddress(address);
-            Audit.Write(AuditCategory.Admin, actor,
+            Events.Publish(SrsEventTypes.AddressBanned, actor,
                 $"Banned {ban.IpAddress}{DescribeBan(ban)}" +
-                (disconnected > 0 ? $", disconnected {disconnected} client(s)" : string.Empty));
+                (disconnected > 0 ? $", disconnected {disconnected} client(s)" : string.Empty),
+                EventPayload.Ban(ban).With("disconnectedClients", disconnected));
             return null;
         }
 
@@ -179,8 +204,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return false;
             }
 
-            Audit.Write(AuditCategory.Admin, actor,
-                $"Removed ban on {ban.IpAddress}" + (ban.PlayerName != null ? $" ({ban.PlayerName})" : string.Empty));
+            Events.Publish(SrsEventTypes.BanRemoved, actor,
+                $"Removed ban on {ban.IpAddress}" + (ban.PlayerName != null ? $" ({ban.PlayerName})" : string.Empty),
+                EventPayload.Ban(ban));
             return true;
         }
 
@@ -212,10 +238,22 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return null;
             }
 
-            Audit.Write(AuditCategory.Admin, actor, definition.Secret
-                ? $"Changed {key}"
-                : $"Changed {key} from \"{previous}\" to \"{current}\"" +
-                  (definition.RequiresRestart && _serverState.IsRunning ? " (applies after a server restart)" : string.Empty));
+            Events.Publish(SrsEventTypes.SettingChanged, actor, definition.Secret
+                    ? $"Changed {key}"
+                    : $"Changed {key} from \"{previous}\" to \"{current}\"" +
+                      (definition.RequiresRestart && _serverState.IsRunning ? " (applies after a server restart)" : string.Empty),
+                new JsonObject
+                {
+                    ["setting"] = new JsonObject
+                    {
+                        ["key"] = key.ToString(),
+                        ["label"] = definition.Label,
+                        ["previousValue"] = definition.Secret ? null : previous,
+                        ["value"] = definition.Secret ? null : current,
+                        ["secret"] = definition.Secret,
+                        ["requiresRestart"] = definition.RequiresRestart
+                    }
+                });
 
             if (key == ServerSettingsKeys.GLOBAL_LOBBY_FREQUENCIES)
             {
@@ -259,7 +297,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
             var message = coalition == ChannelNameSettings.SharedCoalition
                 ? $"Updated channel names ({named} named channel(s))"
                 : $"Updated {ChannelNameSettings.GetCoalitionLabel(coalition)} channel names ({named} named channel(s))";
-            Audit.Write(AuditCategory.Admin, actor, message);
+            PublishChannelNamesChanged(ChannelNameSettings.GetCoalitionLabel(coalition).ToLowerInvariant(), actor,
+                message);
             Events.PublishSettingsChanged();
         }
 
@@ -268,11 +307,27 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
         {
             _settings.SetChannelNames(channelNames);
             var saved = _settings.GetChannelNameSet();
-            Audit.Write(AuditCategory.Admin, actor,
+            PublishChannelNamesChanged("all", actor,
                 $"Updated channel names ({saved.Get(ChannelNameSettings.SharedCoalition).Count} shared, " +
                 $"{saved.Get(ChannelNameSettings.AlliesCoalition).Count} Allies, " +
                 $"{saved.Get(ChannelNameSettings.AxisCoalition).Count} Axis)");
             Events.PublishSettingsChanged();
+        }
+
+        private void PublishChannelNamesChanged(string changed, string actor, string message)
+        {
+            var saved = _settings.GetChannelNameSet();
+            var shared = saved.Get(ChannelNameSettings.SharedCoalition).Count;
+            var allies = saved.Get(ChannelNameSettings.AlliesCoalition).Count;
+            var axis = saved.Get(ChannelNameSettings.AxisCoalition).Count;
+            Events.Publish(SrsEventTypes.ChannelNamesChanged, actor, message, new JsonObject
+            {
+                ["changed"] = changed,
+                ["namedChannels"] = shared + allies + axis,
+                ["shared"] = shared,
+                ["allies"] = allies,
+                ["axis"] = axis
+            });
         }
 
         // API keys (admin UI only; keys cannot manage keys)
@@ -285,7 +340,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
             {
                 var created = _apiKeys.Create(name, scope);
                 record = created.Record;
-                Audit.Write(AuditCategory.Admin, actor, $"Created {scope} API key \"{record.Name}\" ({record.Prefix})");
+                Events.Publish(SrsEventTypes.ApiKeyCreated, actor,
+                    $"Created {scope} API key \"{record.Name}\" ({record.Prefix})", ApiKeyPayload(record));
                 return created.Key;
             }
             catch (ArgumentException ex)
@@ -303,13 +359,32 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                 return false;
             }
 
-            Audit.Write(AuditCategory.Admin, actor, $"Revoked API key \"{key.Name}\" ({key.Prefix})");
+            Events.Publish(SrsEventTypes.ApiKeyRevoked, actor, $"Revoked API key \"{key.Name}\" ({key.Prefix})",
+                ApiKeyPayload(key));
             return true;
         }
 
         private SRClient FindClient(string clientGuid)
         {
             return _serverState.GetClients().FirstOrDefault(c => c.ClientGuid == clientGuid);
+        }
+
+        private JsonObject ClientPayload(SRClient client)
+        {
+            return EventPayload.Client(client, _serverState.GetClientAddress(client.ClientGuid));
+        }
+
+        private JsonObject ServerPayload()
+        {
+            return EventPayload.Server(Port, _serverState.GetClients().Count, _serverState.StartedAtUtc);
+        }
+
+        private static JsonObject ApiKeyPayload(ApiKeyRecord key)
+        {
+            return new JsonObject
+            {
+                ["apiKey"] = new JsonObject { ["name"] = key.Name, ["scope"] = key.Scope, ["prefix"] = key.Prefix }
+            };
         }
 
         private static DateTime? ExpiresAt(TimeSpan? duration)

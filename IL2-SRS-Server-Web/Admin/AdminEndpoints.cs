@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Ciribob.IL2.SimpleRadio.Standalone.Server.Audit;
+using Ciribob.IL2.SimpleRadio.Standalone.Server.Events;
 using Ciribob.IL2.SimpleRadio.Standalone.Server.Network;
 
 namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
@@ -45,14 +45,19 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                     [FromForm] string returnUrl,
                     HttpContext context,
                     AdminAuthOptions auth,
-                    AuditLog audit) =>
+                    ServerEvents events) =>
                 {
                     var target = IsLocalUrl(returnUrl) ? returnUrl : "/";
 
+                    if (string.IsNullOrEmpty(password))
+                    {
+                        return Results.LocalRedirect("/login?error=empty&returnUrl=" + Uri.EscapeDataString(target));
+                    }
+
                     if (!auth.Verify(password))
                     {
-                        audit.Write(AuditCategory.Auth, "anonymous",
-                            $"Failed admin login from {RemoteAddress(context)}");
+                        events.Publish(SrsEventTypes.AdminLoginFailed, "anonymous",
+                            $"Failed admin login from {RemoteAddress(context)}", EventPayload.Remote(RemoteAddress(context)));
                         return Results.LocalRedirect("/login?error=1&returnUrl=" + Uri.EscapeDataString(target));
                     }
 
@@ -62,18 +67,20 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Admin
                     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                         new ClaimsPrincipal(identity));
 
-                    audit.Write(AuditCategory.Auth, "admin", $"Admin login from {RemoteAddress(context)}");
+                    events.Publish(SrsEventTypes.AdminLogin, "admin", $"Admin login from {RemoteAddress(context)}",
+                        EventPayload.Remote(RemoteAddress(context)));
                     return Results.LocalRedirect(target);
                 })
                 .RequireRateLimiting(LoginRateLimitPolicy)
                 .AllowAnonymous()
                 .ExcludeFromDescription();
 
-            endpoints.MapPost("/account/logout", async (HttpContext context, AuditLog audit) =>
+            endpoints.MapPost("/account/logout", async (HttpContext context, ServerEvents events) =>
                 {
                     if (context.User.Identity?.IsAuthenticated == true)
                     {
-                        audit.Write(AuditCategory.Auth, "admin", $"Admin logout from {RemoteAddress(context)}");
+                        events.Publish(SrsEventTypes.AdminLogout, "admin", $"Admin logout from {RemoteAddress(context)}",
+                            EventPayload.Remote(RemoteAddress(context)));
                     }
 
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
