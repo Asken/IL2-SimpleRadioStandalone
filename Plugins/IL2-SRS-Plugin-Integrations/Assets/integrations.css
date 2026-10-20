@@ -86,7 +86,7 @@
     .mobile-cards tr.payload-row { border-top: 1px dashed var(--border); border-top-left-radius: 0; border-top-right-radius: 0; }
 }
 
-:root[data-theme="srs"] .pill-bad { background: #3a1f1c; border: 1px solid #6b332f; }
+:root[data-theme="srs"] .pill-bad { background: var(--lit-bad); border: 1px solid var(--lit-bad-rim); }
 :root[data-theme="srs"] .pill-quiet { background: var(--well); border: 1px solid var(--rim); }
 :root[data-theme="srs"] .field textarea,
 :root[data-theme="srs"] .action-config textarea {

@@ -14,7 +14,8 @@
 
 ### Changed
 
-- Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges.
+- Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges, and the whole theme uses the panels' olive grey.
+- Web server: confirmations such as "Saved Channel Limit." appear as a toast at the top of the page for a few seconds, instead of a line above the page content. Plugins can show them too.
 - Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
 - Web server: form mistakes, such as a password that is too short, are shown under the field instead of in a browser popup.
 - Web server: the admin page reconnects sooner after the server restarts, and reloads by itself when its session has expired.
