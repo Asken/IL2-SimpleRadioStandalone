@@ -199,8 +199,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             var token = TestContext.Current.CancellationToken;
 
-            using (var page = await _http.GetAsync("/does-not-exist", token))
+            foreach (var path in new[] { "/does-not-exist", "/missing/page.html", "/textures/missing.svg" })
             {
+                using var page = await _http.GetAsync(path, token);
                 Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
                 Assert.Contains("Page not found", await page.Content.ReadAsStringAsync(token));
             }
