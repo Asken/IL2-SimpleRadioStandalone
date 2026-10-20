@@ -294,6 +294,7 @@
     <Compile Include="UI\ClientWindow\InputBindingControl.xaml.cs">
       <DependentUpon>InputBindingControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Input\DeviceIdentityCache.cs" />
     <Compile Include="Input\InputDevice.cs" />
     <Compile Include="Input\InputDeviceManager.cs" />
     <Compile Include="Input\InputPollingCycleCache.cs" />
