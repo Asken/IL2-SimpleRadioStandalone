@@ -191,13 +191,40 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             return JsonDocument.Parse(line).RootElement.Clone();
         }
 
+        /// <summary>
+        /// A port the server can open for both TCP and UDP, bound as the server binds them (any address).
+        /// Not a port picked by the OS (port 0): Windows reserves blocks of hundreds of UDP ports inside its
+        /// dynamic range for Hyper-V and Docker Desktop, and hands out dynamic ports nearly in order, so a run of
+        /// them can all be refused for UDP. Random ports below the dynamic range (49152 and up) avoid those blocks,
+        /// and each one is checked for both protocols.
+        /// </summary>
         private static int FindFreePort()
         {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                var port = Random.Shared.Next(20000, 40000);
+                try
+                {
+                    var tcp = new TcpListener(IPAddress.Any, port);
+                    tcp.Start();
+                    try
+                    {
+                        using var udp = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                        udp.Bind(new IPEndPoint(IPAddress.Any, port));
+                        return port;
+                    }
+                    finally
+                    {
+                        tcp.Stop();
+                    }
+                }
+                catch (SocketException)
+                {
+                    // In use or reserved for one of the protocols: try another.
+                }
+            }
+
+            throw new InvalidOperationException("No port is free for both TCP and UDP.");
         }
     }
 }
