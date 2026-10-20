@@ -191,7 +191,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             using var temp = new TempDirectory();
             var path = temp.File(SrsDatabase.FileName);
-            using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString()))
+            using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
             {
                 connection.Open();
                 using var command = connection.CreateCommand();
@@ -203,7 +203,6 @@ PRAGMA user_version = 1;";
                 command.ExecuteNonQuery();
             }
 
-            SqliteConnection.ClearAllPools();
             var database = new SrsDatabase(path);
             Assert.False(database.WasCreated);
 

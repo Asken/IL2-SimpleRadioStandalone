@@ -74,7 +74,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         {
             using var temp = new TempDirectory();
             var path = temp.File(SrsDatabase.FileName);
-            using (var connection = new SqliteConnection("Data Source=" + path))
+            using (var connection = new SqliteConnection("Data Source=" + path + ";Pooling=False"))
             {
                 connection.Open();
                 using var command = connection.CreateCommand();
@@ -86,7 +86,6 @@ PRAGMA user_version = 1;";
                 command.ExecuteNonQuery();
             }
 
-            SqliteConnection.ClearAllPools();
             var database = new SrsDatabase(path);
             Assert.False(database.WasCreated);
 
@@ -113,7 +112,7 @@ PRAGMA user_version = 1;";
         {
             using var temp = new TempDirectory();
             var path = temp.File(SrsDatabase.FileName);
-            using (var connection = new SqliteConnection("Data Source=" + path))
+            using (var connection = new SqliteConnection("Data Source=" + path + ";Pooling=False"))
             {
                 connection.Open();
                 using var command = connection.CreateCommand();
@@ -129,7 +128,6 @@ PRAGMA user_version = " + userVersion + ";";
                 command.ExecuteNonQuery();
             }
 
-            SqliteConnection.ClearAllPools();
             var database = new SrsDatabase(path);
 
             using var check = database.Open();
@@ -175,7 +173,7 @@ PRAGMA user_version = " + userVersion + ";";
                 command.ExecuteNonQuery();
             }
 
-            SqliteConnection.ClearAllPools();
+            SrsDatabase.ClearPool(path);
             var reopened = new SrsDatabase(path);
 
             Assert.Equal(before, Snapshot(reopened));

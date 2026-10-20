@@ -106,7 +106,24 @@ CREATE TABLE IF NOT EXISTS coalition_channel_names (
         public SrsDatabase(string databasePath)
         {
             DatabasePath = databasePath;
-            _connectionString = new SqliteConnectionStringBuilder
+            _connectionString = ConnectionString(databasePath);
+
+            Initialize();
+        }
+
+        /// <summary>
+        /// Closes the idle pooled connections to one database file, so it can be deleted. Unlike
+        /// SqliteConnection.ClearAllPools, connections to other databases are left alone.
+        /// </summary>
+        public static void ClearPool(string databasePath)
+        {
+            using var connection = new SqliteConnection(ConnectionString(databasePath));
+            SqliteConnection.ClearPool(connection);
+        }
+
+        private static string ConnectionString(string databasePath)
+        {
+            return new SqliteConnectionStringBuilder
             {
                 DataSource = databasePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
@@ -114,8 +131,6 @@ CREATE TABLE IF NOT EXISTS coalition_channel_names (
                 Pooling = true,
                 DefaultTimeout = 30
             }.ToString();
-
-            Initialize();
         }
 
         public string DatabasePath { get; }
