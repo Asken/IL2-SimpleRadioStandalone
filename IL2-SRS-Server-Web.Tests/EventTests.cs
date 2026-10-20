@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Ciribob.IL2.SimpleRadio.Standalone.Common;
 using Ciribob.IL2.SimpleRadio.Standalone.Common.Network;
@@ -147,6 +148,73 @@ PRAGMA user_version = " + userVersion + ";";
             using var version = check.CreateCommand();
             version.CommandText = "PRAGMA user_version;";
             Assert.Equal((long)SrsDatabase.SchemaVersion, (long)version.ExecuteScalar());
+        }
+
+        [Fact]
+        public void RunningEveryMigrationAgainChangesNothing()
+        {
+            using var temp = new TempDirectory();
+            var path = temp.File(SrsDatabase.FileName);
+            var database = new SrsDatabase(path);
+            new ServerSettingsStore(database, new Dictionary<string, string>()).SetChannelNames(new Dictionary<int, string> { [1] = "Ops" });
+            using (var connection = database.Open())
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "INSERT INTO events (occurred_at, category, actor, message, type) " +
+                                      "VALUES ('2026-01-01T00:00:00.0000000Z', 'admin', 'admin', 'Kept', 'admin.test');";
+                command.ExecuteNonQuery();
+            }
+
+            var before = Snapshot(database);
+
+            // As when a database numbered by another build is opened: every migration runs again.
+            using (var connection = database.Open())
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA user_version = 0;";
+                command.ExecuteNonQuery();
+            }
+
+            SqliteConnection.ClearAllPools();
+            var reopened = new SrsDatabase(path);
+
+            Assert.Equal(before, Snapshot(reopened));
+        }
+
+        /// <summary>Every table's definition and rows, as text.</summary>
+        private static string Snapshot(SrsDatabase database)
+        {
+            using var connection = database.Open();
+            var tables = new List<string>();
+            var text = new StringBuilder();
+            using (var schema = connection.CreateCommand())
+            {
+                schema.CommandText = "SELECT type, name, sql FROM sqlite_master ORDER BY type, name;";
+                using var reader = schema.ExecuteReader();
+                while (reader.Read())
+                {
+                    text.AppendLine($"{reader.GetString(0)} {reader.GetString(1)}: {(reader.IsDBNull(2) ? null : reader.GetString(2))}");
+                    if (reader.GetString(0) == "table")
+                    {
+                        tables.Add(reader.GetString(1));
+                    }
+                }
+            }
+
+            foreach (var table in tables)
+            {
+                using var rows = connection.CreateCommand();
+                rows.CommandText = $"SELECT * FROM \"{table}\" ORDER BY rowid;";
+                using var reader = rows.ExecuteReader();
+                while (reader.Read())
+                {
+                    var values = new object[reader.FieldCount];
+                    reader.GetValues(values);
+                    text.AppendLine(table + ": " + string.Join(" | ", values.Select(v => v is byte[] b ? Convert.ToBase64String(b) : v)));
+                }
+            }
+
+            return text.ToString();
         }
     }
 
