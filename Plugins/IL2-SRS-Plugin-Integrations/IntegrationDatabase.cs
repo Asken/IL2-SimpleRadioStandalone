@@ -20,11 +20,13 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        /// <summary>Schema changes, in order (see <see cref="SqliteDatabase"/>).</summary>
-        private static readonly string[] Migrations =
+        /// <summary>Schema changes, in order, one statement per string (see <see cref="SqliteDatabase"/>).</summary>
+        private static readonly string[][] Migrations =
         {
             // 1: integrations and their runs (the outbox the dispatcher works through).
-            @"
+            new[]
+            {
+                @"
 CREATE TABLE IF NOT EXISTS integrations (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     name          TEXT NOT NULL,
@@ -38,7 +40,8 @@ CREATE TABLE IF NOT EXISTS integrations (
     max_retries   INTEGER NOT NULL,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
-);
+)",
+                @"
 CREATE TABLE IF NOT EXISTS integration_executions (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     integration_id   INTEGER NOT NULL,
@@ -54,18 +57,22 @@ CREATE TABLE IF NOT EXISTS integration_executions (
     finished_at      TEXT,
     last_error       TEXT,
     result           TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_integration_executions_due ON integration_executions (status, next_attempt_at);
-CREATE INDEX IF NOT EXISTS ix_integration_executions_integration ON integration_executions (integration_id);",
+)",
+                "CREATE INDEX IF NOT EXISTS ix_integration_executions_due ON integration_executions (status, next_attempt_at)",
+                "CREATE INDEX IF NOT EXISTS ix_integration_executions_integration ON integration_executions (integration_id)"
+            },
             // 2: values an action keeps for its integration between runs (e.g. the Discord message it updates).
-            @"
+            new[]
+            {
+                @"
 CREATE TABLE IF NOT EXISTS integration_state (
     integration_id INTEGER NOT NULL,
     key            TEXT NOT NULL,
     value          TEXT NOT NULL,
     updated_at     TEXT NOT NULL,
     PRIMARY KEY (integration_id, key)
-);"
+)"
+            }
         };
 
         public IntegrationDatabase(string databasePath)

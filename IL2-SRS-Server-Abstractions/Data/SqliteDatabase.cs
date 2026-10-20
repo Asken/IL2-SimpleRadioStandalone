@@ -11,12 +11,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
     /// operation. The server's srs.db is one; a plugin can keep its own in its data directory.
     /// </summary>
     /// <remarks>
-    /// Migrations run in order; migration N takes the database from version N to N + 1. Every migration must be
-    /// safe to run again (CREATE ... IF NOT EXISTS; ADD COLUMN is skipped when the column exists): whenever the
-    /// database's version differs from the number of migrations, all of them run, so databases numbered by an
-    /// older build, a newer one or a fork with its own migrations still end up with every table and column. A
-    /// database numbered higher is set back to this build's version, so a build with more migrations runs them
-    /// all again rather than skipping its own.
+    /// Migrations run in order; migration N takes the database from version N to N + 1. A migration is a list of
+    /// SQL statements, one per string, run as written.
+    /// <para>
+    /// Every statement must be safe to run again (CREATE ... IF NOT EXISTS, INSERT OR IGNORE; ADD COLUMN is
+    /// skipped when the column exists): whenever the database's version differs from the number of migrations,
+    /// all of them run, so databases numbered by an older build, a newer one or a fork with its own migrations
+    /// still end up with every table and column. A database numbered higher is set back to this build's
+    /// version, so a build with more migrations runs them all again rather than skipping its own. So a
+    /// migration must never change existing data in a way that is wrong to repeat, such as converting a value.
+    /// </para>
     /// </remarks>
     public class SqliteDatabase
     {
@@ -25,7 +29,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
 
         private readonly string _connectionString;
 
-        public SqliteDatabase(string databasePath, IReadOnlyList<string> migrations)
+        public SqliteDatabase(string databasePath, IReadOnlyList<IReadOnlyList<string>> migrations)
         {
             ArgumentNullException.ThrowIfNull(migrations);
             DatabasePath = databasePath;
@@ -68,7 +72,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
             return value is string text && text.Length > 0 ? ParseTimestamp(text) : (DateTime?)null;
         }
 
-        private void Initialize(IReadOnlyList<string> migrations)
+        private void Initialize(IReadOnlyList<IReadOnlyList<string>> migrations)
         {
             using var connection = Open();
 
@@ -88,16 +92,16 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Data
             using var transaction = connection.BeginTransaction();
             foreach (var migration in migrations)
             {
-                foreach (var statement in migration.Split(';'))
+                foreach (var statement in migration)
                 {
-                    if (string.IsNullOrWhiteSpace(statement) || HasColumnAlready(connection, transaction, statement))
+                    if (HasColumnAlready(connection, transaction, statement))
                     {
                         continue;
                     }
 
                     using var command = connection.CreateCommand();
                     command.Transaction = transaction;
-                    command.CommandText = statement + ";";
+                    command.CommandText = statement;
                     command.ExecuteNonQuery();
                 }
             }
