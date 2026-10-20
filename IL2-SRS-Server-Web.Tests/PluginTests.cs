@@ -130,4 +130,47 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
             Assert.Fail("The plugin's event was not logged.");
         }
     }
+
+    /// <summary>A plugin that fails partway through setting up leaves none of its services behind.</summary>
+    [Collection(ServerCollection.Name)]
+    public class PluginFailureTests
+    {
+        [Fact]
+        public void APluginThatFailsLeavesNoServicesBehind()
+        {
+            using var data = new TempDirectory();
+            ServerPaths.UseDataDirectory(data.Path);
+
+            var builder = WebApplication.CreateBuilder();
+            var before = builder.Services.Count;
+            builder.AddServerPlugin(new FailingPlugin());
+
+            Assert.Equal(before + 1, builder.Services.Count); // Only the plugin catalog, which reports the failure.
+            Assert.DoesNotContain(builder.Services, s => s.ImplementationType == typeof(FailingPlugin.Worker));
+            var failed = Assert.Single(ServerPlugins.Catalog(builder.Services).Failed);
+            Assert.Equal("Setting up the plugin failed: Missing setting", failed.Error);
+        }
+
+        private sealed class FailingPlugin : IServerPlugin
+        {
+            public string Id => "failing";
+
+            public string Name => "Failing";
+
+            public void ConfigureServices(PluginContext context, IServiceCollection services)
+            {
+                services.AddHostedService<Worker>();
+                throw new InvalidOperationException("Missing setting");
+            }
+
+            public void MapApi(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder api)
+            {
+            }
+
+            internal sealed class Worker : Microsoft.Extensions.Hosting.BackgroundService
+            {
+                protected override Task ExecuteAsync(System.Threading.CancellationToken stoppingToken) => Task.CompletedTask;
+            }
+        }
+    }
 }

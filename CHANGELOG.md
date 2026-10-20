@@ -10,22 +10,27 @@
 - Web server: **Integrations** post to Discord or send an HTTP request when something happens on the server, for example a pilot joining or the server starting. Conditions narrow them down, for example to one coalition, and messages are templates with a live preview. A Discord integration can keep updating one message, such as a pinned server status. Runs are queued, retried if allowed and listed under **Runs**. The REST API adds `/api/v1/integrations`.
 - Web server: **plugins** add pages, API endpoints and event handling without changing the server. Integrations are the first plugin and are included in the Docker image and the Windows build. The **Plugins** page and `GET /api/v1/plugins` show what loaded. Copy other plugins into `plugins` in the data folder; only install plugins you trust.
 - Web server: the **Event Log** also records name and coalition changes and radio retuning, and updates live. Every event has a type, such as `client.connected`, and details you can expand. Filter by type, or by one client. The REST API adds `type` and `client` filters to `GET /api/v1/events`, and `GET /api/v1/event-types`.
+- Web server: `SRS_TRUSTED_PROXIES` names the reverse proxy in front of the admin UI. Failed logins are then limited and logged per browser rather than for the proxy, and the login cookie is marked secure when the proxy serves HTTPS.
 
 ### Changed
 
 - Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
 - Web server: form mistakes, such as a password that is too short, are shown under the field instead of in a browser popup.
 - Web server: the admin page reconnects sooner after the server restarts, and reloads by itself when its session has expired.
-
+- Web server: changing the admin password signs out every browser that logged in with the old one.
+- Web server: banning a client disconnects every client from that IP address, as banning the address directly already did.
 - An RCI controller no longer counts itself as a friendly RCI, so its own channel 1 is not renamed "RCI Control".
 - RCI controllers no longer appear as pilots in the Pilot Roster; the RCI status panel shows them instead.
 
 ### Fixed
 
 - The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
+- Web server: two bans added at the same moment could leave one of them out of the list checked when clients connect, until the next ban change.
+- Web server: a plugin that failed while setting up could still run part of itself, such as a background task. It now leaves nothing behind.
 
 ### Compatibility
 
+- After updating the web server, log in to the admin UI again once.
 - The web server upgrades its database (`srs.db`) on first start to store each event's type and details. An older web server can still open the upgraded database. Integrations keep their own database in `plugin-data/integrations`.
 - Back up the `keys` folder with `srs.db`: it encrypts the integrations' webhook addresses, and without it they have to be entered again.
 
