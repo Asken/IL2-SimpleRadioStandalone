@@ -58,3 +58,4 @@ volumes:
   dev-obj:
   dev-nuget:
   il2-srs-dev-data:
+    name: il2-srs-dev-data
