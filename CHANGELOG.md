@@ -9,20 +9,22 @@
 - **RCI Controller mode** for Combat Box RCI officers, under **Settings > RCI Controller**. It lets an officer use SRS without IL-2: SRS uses the codename from the officer's personal access code (shown to pilots as `CODENAME___RCI`), takes the coalition from the code instead of IL-2, and stays on the Combat Box server. Access codes are issued and signed by the Combat Box RCI dashboard; SRS only holds the public key needed to check them. The first time the mode is used, SRS offers an **RCI Controller** profile with Radio 1 in the left ear and Radio 2 in the right.
 - Web server: **Integrations** post to Discord or send an HTTP request when something happens on the server, for example a pilot joining or the server starting. Conditions narrow them down, for example to one coalition, and messages are templates with a live preview. A Discord integration can keep updating one message, such as a pinned server status. Runs are queued, retried if allowed and listed under **Runs**. The REST API adds `/api/v1/integrations`.
 - Web server: **plugins** add pages, API endpoints and event handling without changing the server. Integrations are the first plugin and are included in the Docker image and the Windows build. The **Plugins** page and `GET /api/v1/plugins` show what loaded. Copy other plugins into `plugins` in the data folder; only install plugins you trust.
-- Web server: the **Event Log** also records name and coalition changes and radio retuning, and updates live. Every event has a type, such as `client.connected`, and details you can expand. Filter by type, or by one client. The REST API adds `type` and `client` filters to `GET /api/v1/events`, and `GET /api/v1/event-types`.
 - Web server: `SRS_TRUSTED_PROXIES` names the reverse proxy in front of the admin UI. Failed logins are then limited and logged per browser rather than for the proxy, and the login cookie is marked secure when the proxy serves HTTPS.
+- The web server's event log now also records pilots changing their name or coalition and retuning or turning off a radio (reported once the radio has settled, so turning the dial through several channels is one event). A radio event names the channel as the pilot's coalition sees it.
+- Every web server event now has a type, such as `client.connected` or `admin.client_banned`, and details such as the client, IP address, ban or setting. On the **Event Log** page you can filter by type and click an event to see its details. The API's `/api/v1/events` gains `type` and `client` filters and returns each event's type and details, and `/api/v1/event-types` lists the types and their fields.
 
 ### Changed
 
 - Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges, and the whole theme uses the panels' olive grey.
 - Web server: confirmations such as "Saved Channel Limit." appear as a toast at the top of the page for a few seconds, instead of a line above the page content. Plugins can show them too.
 - Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
-- Web server: form mistakes, such as a password that is too short, are shown under the field instead of in a browser popup.
-- Web server: the admin page reconnects sooner after the server restarts, and reloads by itself when its session has expired.
+- Web server: the admin page reloads by itself when its session has expired.
 - Web server: changing the admin password signs out every browser that logged in with the old one.
 - Web server: banning a client disconnects every client from that IP address, as banning the address directly already did.
 - An RCI controller no longer counts itself as a friendly RCI, so its own channel 1 is not renamed "RCI Control".
 - RCI controllers no longer appear as pilots in the Pilot Roster; the RCI status panel shows them instead.
+- Web server forms (login, API keys, bans and settings) show what is wrong next to the field, instead of a browser pop-up.
+- After the web server restarts, an open admin page notices within seconds and reloads, instead of retrying less and less often.
 
 ### Fixed
 
@@ -41,8 +43,10 @@
 ### Compatibility
 
 - After updating the web server, log in to the admin UI again once.
-- The web server upgrades its database (`srs.db`) on first start to store each event's type and details. An older web server can still open the upgraded database. Integrations keep their own database in `plugin-data/integrations`.
-- Back up the `keys` folder with `srs.db`: it encrypts the integrations' webhook addresses, and without it they have to be entered again.
+- Integrations keep their own database in `plugin-data/integrations`. Back up the `keys` folder with `srs.db`: it encrypts the integrations' webhook addresses, and without it they have to be entered again.
+- The web server upgrades its database (`srs.db`) on first start to store each event's type and details. Events recorded before the upgrade keep their message but have no type. An older web server can still open the upgraded database.
+- The event log now records many more events (every radio retune, name change and coalition change). It still keeps at most 100,000 events, so on a busy server older events, including bans and logins, may be removed before 30 days. Raise `SRS_EVENT_MAX_ROWS` to keep more.
+- The API's events list has a new `radio` category, and each event has new `type`, `clientGuid` and `payload` fields. Existing fields are unchanged.
 
 ## IL2-SRS 1.0.5.0-beta.2
 
