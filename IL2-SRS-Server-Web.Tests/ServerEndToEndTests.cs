@@ -367,29 +367,39 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Tests
         }
 
         /// <summary>
-        /// A port the server can open for both TCP and UDP. A free TCP port isn't always free for UDP: Windows
-        /// reserves some UDP ranges (e.g. for Hyper-V), so the UDP bind is tried too.
+        /// A port the server can open for both TCP and UDP, bound as the server binds them (any address).
+        /// Not a port picked by the OS (port 0): Windows reserves blocks of hundreds of UDP ports inside its
+        /// dynamic range for Hyper-V and Docker Desktop, and hands out dynamic ports nearly in order, so a run of
+        /// them can all be refused for UDP. Random ports below the dynamic range (49152 and up) avoid those blocks,
+        /// and each one is checked for both protocols.
         /// </summary>
         internal static int FindFreePort()
         {
-            for (var attempt = 0; ; attempt++)
+            for (var attempt = 0; attempt < 100; attempt++)
             {
-                var listener = new TcpListener(IPAddress.Any, 0);
-                listener.Start();
+                var port = Random.Shared.Next(20000, 40000);
                 try
                 {
-                    var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                    using var udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
-                    return port;
+                    var tcp = new TcpListener(IPAddress.Any, port);
+                    tcp.Start();
+                    try
+                    {
+                        using var udp = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                        udp.Bind(new IPEndPoint(IPAddress.Any, port));
+                        return port;
+                    }
+                    finally
+                    {
+                        tcp.Stop();
+                    }
                 }
-                catch (SocketException) when (attempt < 20)
+                catch (SocketException)
                 {
-                }
-                finally
-                {
-                    listener.Stop();
+                    // In use or reserved for one of the protocols: try another.
                 }
             }
+
+            throw new InvalidOperationException("No port is free for both TCP and UDP.");
         }
     }
 }
