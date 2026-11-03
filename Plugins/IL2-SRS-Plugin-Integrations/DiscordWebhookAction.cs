@@ -143,7 +143,9 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             }
 
             var url = context.Config.GetText(WebhookUrlField);
-            var wait = _rateLimiter.TryAcquire(url);
+            // Rate limits and stored state use a hash, so the secret URL isn't kept in memory or stored.
+            var webhookId = Hash(url);
+            var wait = _rateLimiter.TryAcquire(webhookId);
             if (wait.HasValue)
             {
                 return IntegrationResult.Defer(
@@ -154,7 +156,7 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             var client = _http.CreateClient(WebhookHttp.ClientName);
             // Test runs always post: they must not edit (or replace) the message real runs keep updated.
             var keepUpdated = context.Config.GetText(MessageModeField) == ModeUpdate && !context.IsTest;
-            var stateKey = MessageStatePrefix + Hash(url);
+            var stateKey = MessageStatePrefix + webhookId;
             if (keepUpdated && context.State.Get(stateKey) is { } messageId)
             {
                 // Webhook message edits can't change the bot name. Fields left out keep their value, so clear the

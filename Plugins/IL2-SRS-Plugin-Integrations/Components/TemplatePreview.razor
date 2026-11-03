@@ -1,5 +1,6 @@
 @* Shows what a template produces with example data, once for each trigger event. *@
 @using System.Text.Json
+@inject IServiceProvider Services
 
 <div class="template-preview">
     @if (Triggers.Count == 0)
@@ -38,11 +39,13 @@
 
     protected override void OnParametersSet()
     {
+        // This server's identity, as Test and real runs use, rather than the example server.* values.
+        var server = EventData.ServerSection((IServerInfo)Services.GetService(typeof(IServerInfo)));
         _previews = Triggers.Select(trigger =>
         {
             try
             {
-                return new Preview(trigger, Render(EventData.Sample(trigger)), null);
+                return new Preview(trigger, Render(EventData.Sample(trigger, server)), null);
             }
             catch (TemplateException ex)
             {

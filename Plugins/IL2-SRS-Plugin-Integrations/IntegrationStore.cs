@@ -310,12 +310,16 @@ WHERE id = $id AND status IN ('failed', 'skipped', 'succeeded');";
             return updated > 0;
         }
 
-        /// <summary>Queues runs left running by a previous process (it stopped mid-run) again.</summary>
+        /// <summary>
+        /// Queues runs left running by a previous process (it stopped mid-run) again. The interrupted attempt is
+        /// not counted, as with <see cref="Defer"/>, so a shutdown does not use up one of the integration's retries.
+        /// </summary>
         public int ResetRunning()
         {
             using var connection = _database.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = @"UPDATE integration_executions SET status = 'queued', next_attempt_at = $now
+            command.CommandText = @"UPDATE integration_executions SET status = 'queued', attempts = MAX(attempts - 1, 0),
+    next_attempt_at = $now
 WHERE status = 'running';";
             command.Parameters.AddWithValue("$now", SqliteDatabase.FormatTimestamp(DateTime.UtcNow));
             return command.ExecuteNonQuery();

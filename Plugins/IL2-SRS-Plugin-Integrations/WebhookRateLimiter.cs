@@ -26,21 +26,46 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations
             _clock = clock;
         }
 
-        /// <summary>Takes a slot for the webhook; returns null when it may send now, otherwise how long to wait.</summary>
+        /// <summary>Webhooks with a message sent in the last minute; the others are forgotten.</summary>
+        internal int Tracked
+        {
+            get
+            {
+                lock (_sent)
+                {
+                    return _sent.Count;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Takes a slot for the webhook; returns null when it may send now, otherwise how long to wait.
+        /// <paramref name="webhook"/> identifies the webhook, e.g. a hash of its URL: it is kept in memory, so it
+        /// should not be the secret URL itself.
+        /// </summary>
         public TimeSpan? TryAcquire(string webhook)
         {
             var now = _clock();
             lock (_sent)
             {
+                // Forget webhooks with nothing sent in the last minute, e.g. deleted integrations or changed URLs.
+                foreach (var (key, queue) in _sent)
+                {
+                    while (queue.Count > 0 && now - queue.Peek() >= Window)
+                    {
+                        queue.Dequeue();
+                    }
+
+                    if (queue.Count == 0)
+                    {
+                        _sent.Remove(key);
+                    }
+                }
+
                 if (!_sent.TryGetValue(webhook, out var sent))
                 {
                     sent = new Queue<DateTime>();
                     _sent[webhook] = sent;
-                }
-
-                while (sent.Count > 0 && now - sent.Peek() >= Window)
-                {
-                    sent.Dequeue();
                 }
 
                 if (sent.Count >= _perMinute)

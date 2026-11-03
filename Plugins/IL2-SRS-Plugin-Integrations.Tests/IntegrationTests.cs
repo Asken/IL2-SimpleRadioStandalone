@@ -697,7 +697,10 @@ WHERE pending.integration_id = 1 AND pending.status IN ('queued', 'running');";
             Assert.False(service.Store.TryStart(id));
 
             Assert.Equal(1, service.Store.ResetRunning());
-            Assert.Equal(ExecutionStatus.Queued, service.Store.GetExecution(id).Status);
+            var run = service.Store.GetExecution(id);
+            Assert.Equal(ExecutionStatus.Queued, run.Status);
+            // The interrupted attempt does not use up one of the integration's retries.
+            Assert.Equal(0, run.Attempts);
         }
 
         private static IntegrationDefinition Save(IntegrationService service, string name,

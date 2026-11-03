@@ -236,7 +236,7 @@
         <button type="button" class="btn btn-quiet" disabled="@_testing" @onclick="Test">
             @(_testing ? "Testing…" : "Test")
         </button>
-        <button type="submit" class="btn btn-primary">@(Id.HasValue ? "Save" : "Create integration")</button>
+        <button type="submit" class="btn btn-primary" disabled="@_saved">@(Id.HasValue ? "Save" : "Create integration")</button>
     </div>
 </form>
 
@@ -266,6 +266,8 @@
     private string _error;
     private IntegrationTestResult _test;
     private bool _testing;
+    // Set once a save succeeds, so a double-click queued behind it does not create the integration twice.
+    private bool _saved;
     private readonly FormState _form = new();
     private IntegrationValidation _validation;
     private bool _focusFirstError;
@@ -432,6 +434,11 @@
 
     private void Save()
     {
+        if (_saved)
+        {
+            return;
+        }
+
         _test = null;
         _error = null;
         if (!CheckBeforeSubmit())
@@ -442,6 +449,7 @@
         _error = Integrations.Save(Draft(), Actor, out _);
         if (_error == null)
         {
+            _saved = true;
             Navigation.NavigateTo("integrations");
         }
     }

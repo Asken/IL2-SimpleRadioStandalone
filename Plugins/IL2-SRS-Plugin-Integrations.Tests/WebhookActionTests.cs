@@ -342,6 +342,8 @@ namespace Ciribob.IL2.SimpleRadio.Standalone.Server.Integrations.Tests
             Assert.Equal(TimeSpan.FromSeconds(60), limiter.TryAcquire("a"));
             now = now.AddSeconds(60);
             Assert.Null(limiter.TryAcquire("a"));
+            // "b" sent nothing in the last minute, so it is forgotten.
+            Assert.Equal(1, limiter.Tracked);
         }
     }
 

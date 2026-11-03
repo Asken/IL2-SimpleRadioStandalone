@@ -3,6 +3,11 @@ title: Web server (Docker and Windows service)
 description: Run the IL2-SRS server in Docker or as a Windows service, managed from the browser and a REST API.
 ---
 
+import { Image } from 'astro:assets';
+import dashboard from '../../../assets/web-server-dashboard.png';
+import eventLog from '../../../assets/web-server-event-log.png';
+import phone from '../../../assets/web-server-phone.png';
+
 The web server is the IL2-SRS server as a .NET 10 application with a browser-based admin UI and a REST API. Existing IL2-SRS clients connect to it exactly as they do to the Windows server window; nothing changes for players.
 
 Use it when you want to:
@@ -18,17 +23,35 @@ The web server is new. The Windows server window remains available while the web
 ## What you get
 
 - **Dashboard** with listener health, uptime, clients, voice links, recent transmitters and recent activity.
+
+  <a href={dashboard.src} target="_blank" rel="noreferrer">
+  	<Image src={dashboard} alt="Web server dashboard in the IL-2 SRS theme, showing server health and recent activity" quality="high" />
+  </a>
+
 - **Clients**: search, mute, kick, and ban with a reason and optional duration.
 - **Settings** and **Channel Names**, applied immediately and sent to connected clients. Channel names can be shared, or set separately for Allies and Axis.
 - **Bans** with reason, who banned, and expiry. Ban an IP address directly or remove a ban.
 - **Event log** of logins, admin actions, server start and stop, client connections and refused connections, name and coalition changes and radio retuning. It updates live; filter it by category, type or client, and click an event to see its details. Old events are removed automatically.
-- **Integrations** that post to Discord or call a web address when something happens on the server, for example a pilot joining or the server starting. See [Integrations](#integrations).
+
+  <a href={eventLog.src} target="_blank" rel="noreferrer">
+  	<Image src={eventLog} alt="Event log with the category and type of each event, filters and live updates" quality="high" />
+  </a>
+
+- **Integrations** that post to Discord or call a web address when something happens on the server, for example a pilot joining or the server starting. See [Integrations](integrations/).
 - **API keys** for the REST API, with read-only or read-write access, and an interactive **API reference**.
 - **Plugins** that add pages, API endpoints and event handling. See [Plugins](#plugins).
 
-Times are shown in your own time zone. The **Desktop / Light / Dark / IL-2 SRS** button in the top bar switches the theme; **Desktop** follows your system setting. The choice is remembered in each browser. On a phone, the menu is a dropdown at the top of the page.
+Times are shown in your own time zone. The **Desktop / Light / Dark / IL-2 SRS** button in the top bar switches the theme; **Desktop** follows your system setting. The choice is remembered in each browser.
 
 Settings, bans, the event log and API keys are stored in `srs.db`, a SQLite database in the server's data folder. Plugins keep their own data under `plugin-data` in the same folder.
+
+## On a phone
+
+The admin UI works in a phone's browser. On a narrow screen, the menu becomes a dropdown at the top of the page, named after the page you are on, and settings are shown in one column. The Integrations and Runs pages show a card for each item instead of a table.
+
+<a href={phone.src} target="_blank" rel="noreferrer">
+	<Image src={phone} width={260} alt="The dashboard on a phone, with the menu as a dropdown at the top of the page" quality="high" />
+</a>
 
 ## Run in Docker
 
@@ -51,7 +74,7 @@ The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a rever
 
 ## Run as a Windows service
 
-1. Get a self-contained build, which needs no .NET installation on the server. Download `IL2-SRS-Server-Web-<version>-win-x64.zip` from [GitHub Releases](https://github.com/riaanjutte/IL2-SimpleRadioStandalone/releases) (from 1.0.5.0-beta.1) and extract it to `C:\IL2-SRS\app`, or publish one yourself:
+1. Get a self-contained build, which needs no .NET installation on the server. Download `IL2-SRS-Server-Web-<version>-win-x64.zip` from the latest [GitHub release](https://github.com/riaanjutte/IL2-SimpleRadioStandalone/releases/latest) and extract it to `C:\IL2-SRS\app`, or publish one yourself:
 
    ```powershell
    dotnet publish IL2-SRS-Server-Web -c Release -r win-x64 --self-contained -o C:\IL2-SRS\app
@@ -80,6 +103,32 @@ To test without a service, run `IL2-SRS-Server.exe --data-dir C:\IL2-SRS\main` f
 ## Move an existing server
 
 Point the data folder at a copy of your existing server folder. On first start, the web server imports `server.cfg` and `banned.txt` into `srs.db`, so settings, channel names and bans carry over. The original files are not changed. After the import, change settings in the admin UI; edits to `server.cfg` are no longer read.
+
+## Back up and update
+
+Everything the server keeps is in its data folder:
+
+| Item | What it holds |
+| --- | --- |
+| `srs.db` | Settings, channel names, bans, the event log and API keys |
+| `keys` | Keys for the login cookie and for encrypting integration webhooks. Without them, webhooks have to be entered again. |
+| `plugin-data` | Each plugin's own data, such as the integrations |
+| `srs-server.json` | Configuration, including the admin password on Windows |
+
+Stop the server before copying the folder, so the database is copied in a consistent state. Keep the data folder on a local disk or a Docker volume, not a network share.
+
+To update in Docker, pull the new image and recreate the container with the same volume:
+
+```sh
+docker pull asken/il2-srs-server:preview
+docker rm -f il2-srs-server
+```
+
+Then run the `docker run` command above again, or use `docker compose pull` and `docker compose up -d`.
+
+On Windows, stop the service with `Stop-Service IL2-SRS-Server`, replace the files in `C:\IL2-SRS\app` with the new build, and start it again with `Start-Service IL2-SRS-Server`.
+
+The server upgrades its database on first start, so back up the data folder before updating if you might want to go back.
 
 ## Configuration
 
@@ -113,14 +162,7 @@ The **API reference** button on the API Keys page opens an interactive reference
 
 ## Integrations
 
-An integration runs an action when one of its events happens, for example **Server started** or **Client connected**. Add conditions to narrow it down, for example only pilots on the Red side. The built-in actions are:
-
-- **Post to Discord** through a channel webhook, as a plain message or a card. It can post a new message for each event, or keep updating one message, for example a server status pinned in the channel.
-- **Send an HTTP request** to any web address, for example a Slack or Teams webhook or your own bot.
-
-Messages are templates filled in from the event, such as `{{ client.name }} joined {{ client.coalitionName }}`, with a live preview on the integration page. **Test** runs the integration once with example data.
-
-Runs are queued, kept across restarts and retried if the integration allows it; **Runs** on the Integrations page lists them. Webhook addresses and headers are stored encrypted with the keys in the `keys` folder and are never shown again, so back up `keys` together with the data.
+Integrations post to Discord or call a web address when something happens on the server, for example a pilot joining or the server starting. See [Integrations](integrations/).
 
 ## Plugins
 
