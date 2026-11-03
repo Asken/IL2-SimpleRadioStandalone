@@ -29,7 +29,7 @@
 - Integrations: when a stored webhook address can't be read (the `keys` folder was replaced), runs fail at once and say to enter it again, instead of retrying with an unclear error.
 - Integrations: two actions with the same type no longer stop the server from starting; the second is ignored and logged.
 - Integrations: double-clicking **Create integration** no longer creates the integration twice.
-- Integrations: a run interrupted by a server restart no longer uses up one of its retries.
+- Integrations: a run interrupted by a server restart no longer uses up one of its retries. A run interrupted a second time fails instead of running again, so one that stops the server can't run on every start; **Run again** retries it.
 - Integrations: the template preview shows this server's name and admin URL, as test and real runs do, instead of the example ones.
 
 ### Compatibility
