@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Web server: **Integrations** post to Discord or send an HTTP request when something happens on the server, for example a pilot joining or the server starting. Conditions narrow them down, for example to one coalition, and messages are templates with a live preview. A Discord integration can keep updating one message, such as a pinned server status. Runs are queued, retried if allowed and listed under **Runs**. The REST API adds `/api/v1/integrations`.
+- Web server: **plugins** add pages, API endpoints and event handling without changing the server. Integrations are the first plugin and are included in the Docker image and the Windows build. The **Plugins** page and `GET /api/v1/plugins` show what loaded. Copy other plugins into `plugins` in the data folder; only install plugins you trust.
+- Web server: `SRS_TRUSTED_PROXIES` names the reverse proxy in front of the admin UI. Failed logins are then limited and logged per browser rather than for the proxy, and the login cookie is marked secure when the proxy serves HTTPS.
+
+### Changed
+
+- Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges, and the whole theme uses the panels' olive grey.
+- Web server: confirmations such as "Saved Channel Limit." appear as a toast at the top of the page for a few seconds, instead of a line above the page content. Plugins can show them too.
+- Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
+- Web server: the admin page reloads by itself when its session has expired.
+- Web server: changing the admin password signs out every browser that logged in with the old one.
+- Web server: banning a client disconnects every client from that IP address, as banning the address directly already did.
+
+### Fixed
+
+- Web server: an address that doesn't exist shows the **Page not found** page with a link to the dashboard, instead of an empty page.
+- Web server: two bans added at the same moment could leave one of them out of the list checked when clients connect, until the next ban change.
+- Web server: a plugin that failed while setting up could still run part of itself, such as a background task. It now leaves nothing behind.
+- Integrations: a run that failed unexpectedly could hold back every later run of its integration until a restart. It is now marked failed.
+- Integrations: an integration created or enabled at the same moment an event arrived could stay unused until another integration changed.
+- Integrations: stored HTTP headers can be removed, with **Remove the stored headers** or `"clearSecrets": ["headers"]` in the API.
+- Integrations: **Run again** gives a failed run its retries again.
+- Integrations: when a stored webhook address can't be read (the `keys` folder was replaced), runs fail at once and say to enter it again, instead of retrying with an unclear error.
+- Integrations: two actions with the same type no longer stop the server from starting; the second is ignored and logged.
+- Integrations: double-clicking **Create integration** no longer creates the integration twice.
+- Integrations: a run interrupted by a server restart no longer uses up one of its retries.
+- Integrations: the template preview shows this server's name and admin URL, as test and real runs do, instead of the example ones.
+
+### Compatibility
+
+- After updating the web server, log in to the admin UI again once.
+- Integrations keep their own database in `plugin-data/integrations`. Back up the `keys` folder with `srs.db`: it encrypts the integrations' webhook addresses, and without it they have to be entered again.
+
 ## IL2-SRS 1.0.5.1
 
 ### Fixed
@@ -67,20 +104,11 @@
 - A **Classic** theme in **Settings > Theme** that brings back the look of the original IL2-SRS 1.0.2.0 client: plain light windows with a steel-blue title bar, standard controls, thin VU bars and light status panels, and a flat grey radio overlay with a green-on-black display. Restart SRS when asked to finish switching to or from Classic. 3D effects, weathering and the VU meter style don't apply to Classic and are greyed out while it is selected; your settings for them are kept. Like 1.0.2.0, the window is a fixed 550 x 610 with the General tab in one column and **Favourites** on its own tab; the other themes keep their layout and remember their own window size. The overlay layout is the same in every theme.
 - Upgrading from the original IL2-SRS 1.0.2.0 (or earlier): the installer now explains what will happen before it starts, keeps your settings, and starts SRS with the Classic theme and in English. Settings you already have from a newer version are never changed.
 - **RCI Controller mode** for Combat Box RCI officers, under **Settings > RCI Controller**. It lets an officer use SRS without IL-2: SRS uses the codename from the officer's personal access code (shown to pilots as `CODENAME___RCI`), takes the coalition from the code instead of IL-2, and stays on the Combat Box server. Access codes are issued and signed by the Combat Box RCI dashboard; SRS only holds the public key needed to check them. The first time the mode is used, SRS offers an **RCI Controller** profile with Radio 1 in the left ear and Radio 2 in the right.
-- Web server: **Integrations** post to Discord or send an HTTP request when something happens on the server, for example a pilot joining or the server starting. Conditions narrow them down, for example to one coalition, and messages are templates with a live preview. A Discord integration can keep updating one message, such as a pinned server status. Runs are queued, retried if allowed and listed under **Runs**. The REST API adds `/api/v1/integrations`.
-- Web server: **plugins** add pages, API endpoints and event handling without changing the server. Integrations are the first plugin and are included in the Docker image and the Windows build. The **Plugins** page and `GET /api/v1/plugins` show what loaded. Copy other plugins into `plugins` in the data folder; only install plugins you trust.
-- Web server: `SRS_TRUSTED_PROXIES` names the reverse proxy in front of the admin UI. Failed logins are then limited and logged per browser rather than for the proxy, and the login cookie is marked secure when the proxy serves HTTPS.
 - The web server's event log now also records pilots changing their name or coalition and retuning or turning off a radio (reported once the radio has settled, so turning the dial through several channels is one event). A radio event names the channel as the pilot's coalition sees it.
 - Every web server event now has a type, such as `client.connected` or `admin.client_banned`, and details such as the client, IP address, ban or setting. On the **Event Log** page you can filter by type and click an event to see its details. The API's `/api/v1/events` gains `type` and `client` filters and returns each event's type and details, and `/api/v1/event-types` lists the types and their fields.
 
 ### Changed
 
-- Web server: panels in the IL-2 SRS theme have worn paint, with scratches, grime and dirt along the edges, and the whole theme uses the panels' olive grey.
-- Web server: confirmations such as "Saved Channel Limit." appear as a toast at the top of the page for a few seconds, instead of a line above the page content. Plugins can show them too.
-- Web server: on a phone, the menu is a dropdown at the top of the page, and the Integrations pages show a card per item.
-- Web server: the admin page reloads by itself when its session has expired.
-- Web server: changing the admin password signs out every browser that logged in with the old one.
-- Web server: banning a client disconnects every client from that IP address, as banning the address directly already did.
 - An RCI controller no longer counts itself as a friendly RCI, so its own channel 1 is not renamed "RCI Control".
 - RCI controllers no longer appear as pilots in the Pilot Roster; the RCI status panel shows them instead.
 - Web server forms (login, API keys, bans and settings) show what is wrong next to the field, instead of a browser pop-up.
@@ -90,20 +118,9 @@
 
 - The buttons at the bottom of the **Help** tab no longer get cut off in a narrow window, including the default window size and the Classic theme. They move onto two rows when one row does not fit.
 - PTT no longer lags when a device with a keybind on it disappears, for example a joystick taken over by Thrustmaster T.A.R.G.E.T. While the device was missing, SRS read the name and product ID of every input device from DirectInput on every PTT check, which slowed checks to about one a second for every keybind, including the keyboard. It now reads each device once. The "PTT input polling took" warning in the log also names the keybinds whose device is missing.
-- Web server: an address that doesn't exist shows the **Page not found** page with a link to the dashboard, instead of an empty page.
-- Web server: two bans added at the same moment could leave one of them out of the list checked when clients connect, until the next ban change.
-- Web server: a plugin that failed while setting up could still run part of itself, such as a background task. It now leaves nothing behind.
-- Integrations: a run that failed unexpectedly could hold back every later run of its integration until a restart. It is now marked failed.
-- Integrations: an integration created or enabled at the same moment an event arrived could stay unused until another integration changed.
-- Integrations: stored HTTP headers can be removed, with **Remove the stored headers** or `"clearSecrets": ["headers"]` in the API.
-- Integrations: **Run again** gives a failed run its retries again.
-- Integrations: when a stored webhook address can't be read (the `keys` folder was replaced), runs fail at once and say to enter it again, instead of retrying with an unclear error.
-- Integrations: two actions with the same type no longer stop the server from starting; the second is ignored and logged.
 
 ### Compatibility
 
-- After updating the web server, log in to the admin UI again once.
-- Integrations keep their own database in `plugin-data/integrations`. Back up the `keys` folder with `srs.db`: it encrypts the integrations' webhook addresses, and without it they have to be entered again.
 - The web server upgrades its database (`srs.db`) on first start to store each event's type and details. Events recorded before the upgrade keep their message but have no type. An older web server can still open the upgraded database.
 - The event log now records many more events (every radio retune, name change and coalition change). It still keeps at most 100,000 events, so on a busy server older events, including bans and logins, may be removed before 30 days. Raise `SRS_EVENT_MAX_ROWS` to keep more.
 - The API's events list has a new `radio` category, and each event has new `type`, `clientGuid` and `payload` fields. Existing fields are unchanged.
