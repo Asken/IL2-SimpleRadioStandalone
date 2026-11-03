@@ -128,28 +128,39 @@ CREATE TABLE IF NOT EXISTS integration_state (
                     return;
                 }
 
-                using var transaction = connection.BeginTransaction();
+                // Copy and drop in separate transactions: in WAL mode SQLite does not commit attached databases
+                // atomically, so a crash in a single commit could drop the old tables without keeping the copy.
+                // Dropping only after the copy is committed means a crash leaves the old tables to copy again.
                 var moved = new List<string>();
-                foreach (var table in present)
+                using (var transaction = connection.BeginTransaction())
                 {
-                    var columns = string.Join(", ", Columns(connection, transaction, "main", table)
-                        .Intersect(Columns(connection, transaction, "older", table)));
-                    using var copy = connection.CreateCommand();
-                    copy.Transaction = transaction;
-                    copy.CommandText =
-                        $"INSERT OR IGNORE INTO main.{table} ({columns}) SELECT {columns} FROM older.{table};";
-                    moved.Add($"{copy.ExecuteNonQuery()} {table}");
+                    foreach (var table in present)
+                    {
+                        var columns = string.Join(", ", Columns(connection, transaction, "main", table)
+                            .Intersect(Columns(connection, transaction, "older", table)));
+                        using var copy = connection.CreateCommand();
+                        copy.Transaction = transaction;
+                        copy.CommandText =
+                            $"INSERT OR IGNORE INTO main.{table} ({columns}) SELECT {columns} FROM older.{table};";
+                        moved.Add($"{copy.ExecuteNonQuery()} {table}");
+                    }
+
+                    transaction.Commit();
                 }
 
-                foreach (var table in present)
+                using (var transaction = connection.BeginTransaction())
                 {
-                    using var drop = connection.CreateCommand();
-                    drop.Transaction = transaction;
-                    drop.CommandText = $"DROP TABLE older.{table};";
-                    drop.ExecuteNonQuery();
+                    foreach (var table in present)
+                    {
+                        using var drop = connection.CreateCommand();
+                        drop.Transaction = transaction;
+                        drop.CommandText = $"DROP TABLE older.{table};";
+                        drop.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
                 }
 
-                transaction.Commit();
                 Logger.Info($"Moved integrations from {olderDatabasePath} to {DatabasePath}: {string.Join(", ", moved)}");
             }
             finally
