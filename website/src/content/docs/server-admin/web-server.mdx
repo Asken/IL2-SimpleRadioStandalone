@@ -69,7 +69,7 @@ This publishes the SRS port `6002` for TCP and UDP, keeps the admin UI on `http:
 `docker ps` shows the container as `healthy` while both SRS listeners are running. It turns `unhealthy` if a listener fails, or while an admin has stopped the server from the dashboard.
 
 :::caution[Protect the admin UI]
-The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a reverse proxy with HTTPS (Caddy, Traefik, nginx) in front of it before exposing it to the internet. Then set `SRS_TRUSTED_PROXIES` to the proxy's address or network, so failed logins are limited and logged per browser and the login cookie is marked secure.
+The admin UI and API use plain HTTP. You can publish port 8080 to the internet, but it is not recommended: apart from a limit of 10 login attempts a minute per address, the server has no rate limiting, DDoS protection or two-factor login. Reach it through a tunnel instead. See [Reach the admin UI remotely](#reach-the-admin-ui-remotely).
 :::
 
 ## Run as a Windows service
@@ -99,6 +99,32 @@ The admin UI and API use plain HTTP. Keep port 8080 on localhost, or put a rever
 3. Open `http://localhost:8080` on the server and log in.
 
 To test without a service, run `IL2-SRS-Server.exe --data-dir C:\IL2-SRS\main` from a console with `SRS_ADMIN_PASSWORD` set. Without `--data-dir`, the server keeps its data next to the exe, or in `C:\ProgramData\IL2-SRS-Server` when that folder is not writable (for example under `C:\Program Files`).
+
+## Reach the admin UI remotely
+
+Use a tunnel such as [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or [Tailscale](https://tailscale.com/). A tunnel needs no open port and adds HTTPS. With Cloudflare, add a Cloudflare Access policy to the hostname, so only your admins reach the login page.
+
+- **Tunnel on the same machine:** point it at `http://localhost:8080`. Nothing else to set.
+- **Tunnel in another container:** run it on the same Docker network and point it at `http://il2-srs-server:8080`. Set `SRS_TRUSTED_PROXIES` to the network's range, so failed logins are limited and logged per browser and the login cookie is marked secure. For example, with Cloudflare Tunnel in the same compose file:
+
+  ```yaml
+  services:
+    il2-srs-server:
+      # ...as in docker-compose.yml, plus:
+      environment:
+        SRS_TRUSTED_PROXIES: "172.18.0.0/16"
+
+    cloudflared:
+      image: cloudflare/cloudflared:latest
+      restart: unless-stopped
+      command: tunnel run
+      environment:
+        TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+  ```
+
+  `docker network inspect` shows the network's range.
+
+Set **Public Admin URL** under **Settings** to the tunnel's address, so integration messages can link to the admin UI.
 
 ## Move an existing server
 
@@ -141,7 +167,7 @@ Set these as environment variables, as `--KEY=value` arguments, or in `srs-serve
 | `SRS_<SETTING>` | Fix any [server setting](../configuration-reference/), for example `SRS_SERVER_PORT=6002`. Fixed settings are shown as locked in the admin UI. |
 | `SRS_EVENT_RETENTION_DAYS` | Keep events for this many days (default 30). |
 | `SRS_EVENT_MAX_ROWS` | Keep at most this many events (default 100000). |
-| `SRS_TRUSTED_PROXIES` | Your reverse proxy's address or network, for example `172.18.0.0/16`. Separate several with `,`. |
+| `SRS_TRUSTED_PROXIES` | The address or network of your tunnel or reverse proxy, when it runs in another container or on another machine, for example `172.18.0.0/16`. Separate several with `,`. |
 | `urls` | Admin UI address. Defaults to `http://localhost:8080` on Windows and port 8080 on all interfaces in Docker. |
 
 Run several servers by giving each its own data folder and SRS port, and on Windows its own service name and admin UI address.
